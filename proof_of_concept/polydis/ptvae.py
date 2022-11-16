@@ -478,7 +478,7 @@ class PtvaeDecoder(nn.Module):
                 token = x_summarized[:, t].unsqueeze(1)
             else:
                 token = pack_padded_sequence(predicted_notes,
-                                             predicted_lengths,
+                                             predicted_lengths.cpu(),
                                              batch_first=True,
                                              enforce_sorted=False)
                 token = self.dec_notes_emb_gru(token)[-1].\

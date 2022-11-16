@@ -18,6 +18,7 @@ def profile_polydis(n_iter=3):
     model = DisentangleVAE.init_model(device)
     model_path = 'result/models/disvae-nozoth_epoch.pt'  
     model.load_model(model_path, map_location=device)
+    model.to(device)
 
     # Load the dataset 
     shift_low = -6
@@ -45,8 +46,8 @@ def profile_polydis(n_iter=3):
 
                     with record_function("batch"):
                         melody, pr, pr_mat, ptree, _ = batch
-                        pr_mat = pr_mat[0]
-                        chord = fun_utils.gen_chord().unsqueeze(0)
+                        pr_mat = pr_mat[0].to(device)
+                        chord = fun_utils.gen_chord().unsqueeze(0).to(device)
 
                         with record_function("Polydis inference"):
                             # Spell out the swap function and profile each component
