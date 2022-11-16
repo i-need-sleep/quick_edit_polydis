@@ -1,0 +1,17 @@
+# Misc
+*.pyc
+
+# Data
+*/data
+*.mid
+*.npy
+*.npz
+*.hi
+*.json
+
+# Models
+*.pt
+
+# sh
+*.err
+*.log
