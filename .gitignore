@@ -14,4 +14,4 @@
 
 # sh
 *.err
-*.log
+*.out
