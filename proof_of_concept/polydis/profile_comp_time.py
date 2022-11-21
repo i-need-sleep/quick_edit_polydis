@@ -65,8 +65,6 @@ def profile_polydis(n_iter=3):
                                     dec_z = torch.cat([z_chd, z_rhy], dim=-1)
                                 
                                 with record_function('decode'):
-                                    pitch_outs, dur_outs = model.decoder(dec_z, True, None,
-                                                                        None, 0., 0.)
                                     # Spell out decider
                                     z, inference, x, lengths, teacher_forcing_ratio1, teacher_forcing_ratio2 = dec_z, True, None, None, 0., 0.
                                     # z: (B, z_size)
