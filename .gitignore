@@ -17,4 +17,4 @@ pretrained
 
 # sh
 *.err
-*.log
+*.out
