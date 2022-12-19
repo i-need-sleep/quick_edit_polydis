@@ -1,7 +1,9 @@
 # Misc
 *.pyc
+*/debug.py
 
 # Data
+data
 */data
 *.mid
 *.npy
@@ -10,6 +12,7 @@
 *.json
 
 # Models
+pretrained
 *.pt
 
 # sh
