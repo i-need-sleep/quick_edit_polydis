@@ -88,6 +88,7 @@ class MuseBERT(PytorchModel):
         """
         batch -> output distribution
         :param data_in: (bs, L, 3) dtype long. Last dim: onset, pitch, dur.
+        ^ This is incorrect. data_in: (bs, L, 7) dtype long. Last dim: the factorized atrs.
         :param rel_mat: (bs, k, L, L)
         :param mask: (bs, L, L) dtype long
         :return: (bs, L, pitch + dur dims)
@@ -95,12 +96,6 @@ class MuseBERT(PytorchModel):
         x = self.onset_pitch_dur_embedding(data_in)
         x = self.tfm(x, rel_mat, mask=mask)
         x = self.out(x)
-        return x
-
-    def encode(self, data_in, rel_mat, mask):
-        # Run without the recons head
-        x = self.onset_pitch_dur_embedding(data_in)
-        x = self.tfm(x, rel_mat, mask=mask)
         return x
 
     def loss_function(self, recon, tgt, inds, beta):
@@ -133,6 +128,7 @@ class MuseBERT(PytorchModel):
         return (total_loss, *losses)
 
     def loss(self, data, data_in, rel_mat, mask, inds, length, beta):
+        print(rel_mat.shape, mask.shape)
         data_in, mask, rel_mat, data, inds = \
             self.truncate(data_in, mask, rel_mat, data, inds, length)
         recon = self.run(data_in, rel_mat, mask)

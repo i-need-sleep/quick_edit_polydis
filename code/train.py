@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from transformers import AdamW
 
 from dataset import LoaderWrapper
-from models.edit_musebert import EditMuseBERT, EditMuseBERTDecoder
+from models.edit_musebert import EditMuseBERT
 
 def train(args):
 
@@ -26,16 +26,14 @@ def train(args):
 
     # Setup Tensorboard
     date_str = str(datetime.datetime.now())[:-7].replace(':','-')
-    writer = SummaryWriter(log_dir=f'../result/runs/{args.name}/batch_size={args.batch_size}, Adam_lr_enc={args.lr_encoder}, dec={args.lr_decoder}/{date_str}' ,comment=f'{args.name}, batch_size={args.batch_size}, Adam_lr_enc={args.lr_encoder}, dec={args.lr_decoder}, {date_str}')
+    writer = SummaryWriter(log_dir=f'../results/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=f'{args.name}, batch_size={args.batch_size}, Adam_lr_enc={args.lr}, {date_str}')
 
     # Setup training
-    model_encoder = EditMuseBERT(device, n_edit_types=wrapper.collate.editor.pitch_range)
-    model_decoder = EditMuseBERTDecoder(device)
+    model = EditMuseBERT(device, n_edit_types=wrapper.collate.editor.pitch_range)
     criterion = torch.nn.CrossEntropyLoss()
 
-    # Two optimizers
-    optimizer_enc = AdamW(model_encoder.parameters(), lr=args.lr_encoder)
-    optimizer_dec = AdamW(model_decoder.parameters(), lr=args.lr_encoder)
+    # Optimizer
+    optimizer_enc = AdamW(model.parameters(), lr=args.lr)
 
     # Load from checkpoints
     if args.checkpoint != '':
@@ -50,8 +48,29 @@ def train(args):
     for epoch in range(args.n_epoch):
         for batch_idx, batch in enumerate(train_loader):
 
-            model_encoder.train()
-            model_decoder.train()
+            model.train()
+
+            chd = torch.tensor(batch['chords']).to(device)
+            cpt_atr = torch.tensor(batch['cpt_atr']).to(device)
+            atr = torch.tensor(batch['atr']).to(device)
+            cpt_rel = torch.tensor(batch['cpt_rel']).to(device)
+            notes = torch.tensor(batch['notes_out']).to(device)
+            mask = torch.tensor(batch['mask']).to(device)
+            length = batch['length']
+
+            pitch_changes = batch['pitch_changes'] # TODO : pool this into a tensor 
+            c = 0
+            for p in pitch_changes:
+                c += len(p)
+            print(c)
+            
+
+            z_chd = model.encode_chd(chd)
+            edits_out, n_inserts_out = model.encode(atr, cpt_rel, z_chd, length)
+            print(edits_out.shape)
+            
+            exit()
+
 
 
 
@@ -333,8 +352,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--batch_size_dev', default=16, type=int)
-    parser.add_argument('--lr_encoder', default=1e-6, type=float)
-    parser.add_argument('--lr_decoder', default=1e-6, type=float)
+    parser.add_argument('--lr', default=1e-6, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--n_refine', default=4, type=int)
     parser.add_argument('--checkpoint', default='', type=str) 

@@ -13,6 +13,7 @@ data
 
 # Models
 pretrained
+results
 *.pt
 
 # sh

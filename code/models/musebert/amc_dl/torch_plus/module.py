@@ -132,7 +132,7 @@ class TrainingInterface:
         epoch_loss_dic = self._init_loss_dic()
 
         for i, batch in enumerate(self.data_loaders.train_loader):
-            # print(batch)
+            
             inputs = self._batch_to_inputs(batch)
             self.opt_scheduler.optimizer_zero_grad()
             input_params = self.param_scheduler.step()

@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from typing import Union
 
 
@@ -188,6 +189,7 @@ def pitch_attributes_to_pitch(p_highness, p_register, p_degree):
 
     def p_hig_p_reg_p_deg_to_p(p_hig, p_reg, p_deg, vr, lr, rr):
         p = np.zeros_like(p_hig)
+        vr = torch.tensor(vr).bool()
         p[vr] = 24 + 12 * (p_hig[vr] + p_reg[vr]) + p_deg[vr]
         p[lr] = 12 * p_reg[lr] + p_deg[lr]
         p[rr] = 108 + 12 * p_reg[rr] + p_deg[rr]

@@ -96,6 +96,7 @@ class PolyphonicDataset(Dataset):
 
         # square mask to mask out the pad tokens
         mask = self.generate_attention_mask(length)
+        print(cpt_relmat.shape, mask.shape)
 
         return atr_mat.astype(np.int64), cpt_atrmat.astype(np.int64), \
             cpt_relmat.astype(np.int8), mask.astype(np.int8), \

@@ -7,6 +7,7 @@ from models.polydis.model import DisentangleVAE
 from models.musebert.note_attribute_repr import NoteAttributeAutoEncoder
 from models.musebert.note_attribute_corrupter import SimpleCorrupter
 from models.musebert.curriculum_preset import default_autoenc_dict
+
 import utils.chord_sampler
 import utils.rules
 import utils.edits
@@ -84,6 +85,7 @@ class Collate(object):
         
         # Process each line
         notes_out, pitch_changes, n_inserts, inserts = [], [], [], []
+        atr, cpt_atr, cpt_rel, mask, inds, length = [], [], [], [], [], []
         for line_idx in range(pr_mat.shape[0]):
             # Notes after HST
             _, notes_polydis = self.polydis.decoder.grid_to_pr_and_notes(ptree_polydis[line_idx].astype(int))
@@ -97,19 +99,43 @@ class Collate(object):
             # Derive edits 
             notes_out_line, pitch_changes_line, n_inserts_line, inserts_line = self.editor.get_edits(notes_rule, notes_polydis)
             
-            self.converter.convert(notes_out_line)
-            exit()
-
             notes_out.append(notes_out_line)
             pitch_changes.append(pitch_changes_line)
             n_inserts.append(n_inserts_line)
             inserts.append(inserts_line)
 
+            # Convert notes for MuseBERT input
+            atr_l, cpt_atr_l, cpt_rel_l, mask_l, inds_l, length_l = self.converter.convert(notes_out_line)
+            
+            atr.append(atr_l)
+            cpt_atr.append(cpt_atr_l)
+            cpt_rel.append(cpt_rel_l)
+            mask.append(mask_l)
+            inds.append(inds_l)
+            length.append(length_l)
+
             if self.max_n_inserts < max(n_inserts_line):
                 self.max_n_inserts = max(n_inserts_line) # this is around 6 in pop909
-        print(self.max_n_inserts)
+                
+        atr = np.array(atr)
+        cpt_atr = np.array(cpt_atr)
+        cpt_rel = np.array(cpt_rel)
+        mask = np.array(mask)
+        inds = np.array(inds)
             
-        return chords, notes_out, pitch_changes, n_inserts, inserts
+        return {
+            'chords': chords,
+            'notes_out': notes_out,
+            'pitch_changes': pitch_changes,
+            'n_inserts': n_inserts,
+            'inserts': inserts,
+            'atr': atr,
+            'cpt_atr': cpt_atr,
+            'cpt_rel': cpt_rel,
+            'mask': mask,
+            'inds': inds,
+            'length': length
+        }
 
 class LoaderWrapper(object):
     def __init__(self, batch_size, shuffle=True):
@@ -133,7 +159,7 @@ class LoaderWrapper(object):
 class Note2MuseBERTConverter():
     def __init__(self):
         self.pad_length = 100 
-        self.antoenc = NoteAttributeAutoEncoder(**default_autoenc_dict)
+        self.repr_autoenc = NoteAttributeAutoEncoder(**default_autoenc_dict)
 
         # Set up a corruptor that does not corrupt
         corruptor_dict  = {
@@ -144,7 +170,7 @@ class Note2MuseBERTConverter():
             'unknown_ratio': 0.,
             'relmat_cpt_ratio': 0.
         }
-        self.corruptor = SimpleCorrupter(**corruptor_dict)
+        self.corrupter = SimpleCorrupter(**corruptor_dict)
 
     def convert(self, notes):
         # Zero-pad the notes up self.pad_length
@@ -153,8 +179,9 @@ class Note2MuseBERTConverter():
             print('TOO LOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOONG!??')
             raise
 
-        while notes_len < self.pad_length:
+        while len(notes) < self.pad_length:
             notes.append([0, 0, 0])
+        notes = np.array(notes)
 
         # Make the factorised atr mat and ctp mat
         self.repr_autoenc.fast_mode()
@@ -170,6 +197,11 @@ class Note2MuseBERTConverter():
         return atr_mat.astype(np.int64), cpt_atrmat.astype(np.int64), \
             cpt_relmat.astype(np.int8), mask.astype(np.int8), \
             inds.astype(bool), notes_len
+
+    def generate_attention_mask(self, length):
+        mask = np.zeros((self.pad_length, self.pad_length), dtype=np.int8)
+        mask[0: length, 0: length] = 1
+        return mask
 
 if __name__ == '__main__':
     wrapper = LoaderWrapper(3)
