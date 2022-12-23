@@ -109,3 +109,10 @@ class DefaultEditSet():
                 else:
                     out[dur].append(pitch)
         return out
+
+    def prep_decoder_notes(self, inserts_line, decoder_notes_in_line):
+        print(inserts_line)
+        print(decoder_notes_in_line)
+        exit()
+
+        return 

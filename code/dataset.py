@@ -35,17 +35,37 @@ class EditDatast(Dataset):
         self.polydis_dataset = dtst.wrap_dataset(fns, range, shift_low, shift_high,
                                 num_bar=num_bar, contain_chord=contain_chord)
 
+        # Draw chords from the full 909 dataset
+        full_909 = dtst.wrap_dataset(fns, np.arange(len(fns)), shift_low, shift_high,
+                                num_bar=num_bar, contain_chord=contain_chord)
+        self.sampler909 = utils.chord_sampler.Sampler909(full_909)
+
+        self.chord_sampling_method = '909_prog'
+
     def __len__(self):
         return len(self.polydis_dataset)
 
     def __getitem__(self, index):
-        melody, pr, pr_mat, ptree, chord = self.polydis_dataset[index]
+        _, _, pr_mat, ptree, _ = self.polydis_dataset[index]
         pr_mat = torch.tensor(pr_mat)
         ptree = torch.tensor(ptree)
 
-        # For the test implementation, let's stick with triads.
-        sampling_method = utils.chord_sampler.random_triad_step
-        chords = utils.chord_sampler.gen_chords(sampling_method)
+        if self.chord_sampling_method == 'triad':
+            # Randomly sample triads in the root position
+            step_method = utils.chord_sampler.random_triad_step
+            chords = utils.chord_sampler.gen_chords(step_method)
+        if self.chord_sampling_method == 'any':
+            # Randomly sample any chord with any chorma at with any bass
+            step_method = utils.chord_sampler.random_any_step
+            chords = utils.chord_sampler.gen_chords(step_method)
+        elif self.chord_sampling_method == '909_chord':
+            # Sample chords by their frequency in Pop909
+            step_method = self.sampler909.draw_chord
+            chords = utils.chord_sampler.gen_chords(step_method)
+        elif self.chord_sampling_method == '909_prog':
+            # Sample a sequence of chords by their frequency in Pop909
+            chords = self.sampler909.draw_prog()
+
         return pr_mat, ptree, chords
 
 class Collate(object):
@@ -98,10 +118,9 @@ class Collate(object):
 
             # Derive edits 
             notes_out_line, pitch_changes_line, n_inserts_line, inserts_line, decoder_notes_in_line = self.editor.get_edits(notes_rule, notes_polydis)
-            print(decoder_notes_in_line)
-            print(inserts_line)
-            exit()
-            decoder_notes_out_line, decoder_onsets, decoder_pitches = self.editor.prep_decoder_notes(inserts_line, decoder_notes_in_line) # implement me
+            
+            # Given inserts, n_inserts and decoder inputs, build input/output tokens
+            decoder_notes_out_line = self.editor.prep_decoder_notes(inserts_line, decoder_notes_in_line) # implement me
             
             notes_out.append(notes_out_line)
             pitch_changes.append(pitch_changes_line)

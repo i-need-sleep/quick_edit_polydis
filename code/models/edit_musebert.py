@@ -73,4 +73,5 @@ class EditMuseBERT(torch.nn.Module):
         
     def forward(self):
         # implement me
+        raise
         return

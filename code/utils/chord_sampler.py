@@ -11,7 +11,7 @@ def gen_chords(step_func):
     return out
 
 # Generate a random chord
-# For now, uniformly sample a triad in root position. At actual training time, consider basing the sample distribution on noised frequencies. 
+# Uniformly sample a triad in root position.
 def random_triad_step():
     root = torch.randint(high=12, size=(1, ))
     bass = 0
@@ -55,14 +55,21 @@ def random_any_step():
 
     return out
 
-# To-Do:
 # Sample chords according to their frequency in Pop909
 class Sampler909():
     def __init__(self, dataset):
-        pass
+        self.dataset = dataset
 
-    def draw_chords():
-        return
+    def draw_chord(self):
+        prog = self.draw_prog()
+        idx = random.randint(0, 7)
+        return torch.tensor(prog[idx, :]).double()
+    
+    def draw_prog(self):
+        idx = random.randint(0, len(self.dataset))
+        _, _, _, _, prog = self.dataset[idx]
+        return torch.tensor(prog).double()
+    
 
 if __name__ == '__main__':
     out = random_any_step()
