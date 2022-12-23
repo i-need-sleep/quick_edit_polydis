@@ -1,4 +1,4 @@
-import torch
+import random
 
 class DefaultEditSet():
     '''
@@ -20,28 +20,29 @@ class DefaultEditSet():
         inserts = [[] for _ in range(self.n_steps)] # [[pitch, duration], ...] for each step...
         # ...Might include some pitches in pitch changes. 
         # REMEMBER TO ADJUST THE ORACLE OUT AT TRAINING TIME
+        decoder_notes_in = []
 
         for step in range(self.n_steps):
             note_groups_in = self._find_note_groups(notes_in, step)
             note_groups_ref = self._find_note_groups(notes_ref, step)
 
-            notes_out_step, pitch_changes_step, n_inserts_step, inserts_step = self._get_edits_step(note_groups_in, note_groups_ref, step)
+            notes_out_step, pitch_changes_step, n_inserts_step, inserts_step, decoder_notes_in_step = self._get_edits_step(note_groups_in, note_groups_ref, step)
 
             notes_out += notes_out_step
             pitch_changes += pitch_changes_step
             n_inserts[step] = n_inserts_step
             inserts[step] = inserts_step
+            decoder_notes_in += decoder_notes_in_step
             
-        return notes_out, pitch_changes, n_inserts, inserts
-    
-    def build_editor_target(self):
-        return
+        return notes_out, pitch_changes, n_inserts, inserts, decoder_notes_in
 
     def _get_edits_step(self, note_groups_in, note_groups_ref, start):
         note_out = []
         pitch_changes = []
         n_inserts = 0
         inserts = []
+
+        decoder_notes_in = [] # Context for the decoder [[start, pitch, duration], ...]
         
         for dur, pitches in note_groups_in.items():
 
@@ -73,11 +74,18 @@ class DefaultEditSet():
                     note_out.append([start, pitch, dur])
                     pitch_changes.append(p_change)
 
-                # Build inserts. Include all ref pitches with the same onset/dur. Adjust the oracle during training.
+                # Build inserts. Include all ref pitches with the same onset/dur. Adjust the oracle during training. 
                 if len(pitches_ref) > len(pitches):
                     n_inserts += len(pitches_ref) - len(pitches)
                     for p in pitches_ref:
                         inserts.append([p, dur])
+
+                # Build decoder note inputs
+                selected_pitches = random.sample(pitches_ref, min([len(pitches), len(pitches_ref)]))
+                for p in selected_pitches:
+                    decoder_notes_in.append([start, p, dur])
+                    
+
         
         # Handle "pure" inserts
         for dur, pitches in note_groups_ref.items():
@@ -86,7 +94,7 @@ class DefaultEditSet():
                 for p in pitches:
                     inserts.append([p, dur])
 
-        return note_out, pitch_changes, n_inserts, inserts
+        return note_out, pitch_changes, n_inserts, inserts, decoder_notes_in
 
     def _find_note_groups(self, notes, start):
         # Find note groups with the same onset/durations,

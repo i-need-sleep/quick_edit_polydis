@@ -97,7 +97,11 @@ class Collate(object):
             notes_rule = utils.rules.nearest_neighbour(notes, chords[line_idx])
 
             # Derive edits 
-            notes_out_line, pitch_changes_line, n_inserts_line, inserts_line = self.editor.get_edits(notes_rule, notes_polydis)
+            notes_out_line, pitch_changes_line, n_inserts_line, inserts_line, decoder_notes_in_line = self.editor.get_edits(notes_rule, notes_polydis)
+            print(decoder_notes_in_line)
+            print(inserts_line)
+            exit()
+            decoder_notes_out_line, decoder_onsets, decoder_pitches = self.editor.prep_decoder_notes(inserts_line, decoder_notes_in_line) # implement me
             
             notes_out.append(notes_out_line)
             pitch_changes.append(pitch_changes_line)
@@ -125,10 +129,12 @@ class Collate(object):
             
         return {
             'chords': chords,
+
             'notes_out': notes_out,
             'pitch_changes': pitch_changes,
             'n_inserts': n_inserts,
             'inserts': inserts,
+
             'atr': atr,
             'cpt_atr': cpt_atr,
             'cpt_rel': cpt_rel,

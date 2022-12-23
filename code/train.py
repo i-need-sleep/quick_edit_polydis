@@ -9,13 +9,14 @@ from transformers import AdamW
 
 from dataset import LoaderWrapper
 from models.edit_musebert import EditMuseBERT
+from utils.data_utils import prep_batch
 
 def train(args):
 
     print(args)
 
     # Device
-    torch.manual_seed(21)
+    # torch.manual_seed(21)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(device)
 
@@ -33,7 +34,7 @@ def train(args):
     criterion = torch.nn.CrossEntropyLoss()
 
     # Optimizer
-    optimizer_enc = AdamW(model.parameters(), lr=args.lr)
+    optimiser = AdamW(model.parameters(), lr=args.lr)
 
     # Load from checkpoints
     if args.checkpoint != '':
@@ -49,25 +50,25 @@ def train(args):
         for batch_idx, batch in enumerate(train_loader):
 
             model.train()
+            optimiser.zero_grad()
 
-            chd = torch.tensor(batch['chords']).to(device)
-            cpt_atr = torch.tensor(batch['cpt_atr']).to(device)
-            atr = torch.tensor(batch['atr']).to(device)
-            cpt_rel = torch.tensor(batch['cpt_rel']).to(device)
-            notes = torch.tensor(batch['notes_out']).to(device)
-            mask = torch.tensor(batch['mask']).to(device)
-            length = batch['length']
+            chd, editor_in, edits_ref, n_inserts_ref = prep_batch(batch, device)
 
-            pitch_changes = batch['pitch_changes'] # TODO : pool this into a tensor 
-            c = 0
-            for p in pitch_changes:
-                c += len(p)
-            print(c)
-            
-
+            # Encoder forward pass
             z_chd = model.encode_chd(chd)
-            edits_out, n_inserts_out = model.encode(atr, cpt_rel, z_chd, length)
-            print(edits_out.shape)
+            z_pool, edits_out, n_inserts_out = model.encode(editor_in, z_chd)
+
+            # Encoder loss
+            edits_loss = criterion(edits_out, edits_ref)
+            n_inserts_loss = criterion(n_inserts_out, n_inserts_ref)
+            
+            # Decoder forward pass
+            # Teacher forcing
+
+
+            # TODO: Student forcing, dynamic oracle
+
+
             
             exit()
 
@@ -354,7 +355,6 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size_dev', default=16, type=int)
     parser.add_argument('--lr', default=1e-6, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
-    parser.add_argument('--n_refine', default=4, type=int)
     parser.add_argument('--checkpoint', default='', type=str) 
 
     args = parser.parse_args()
