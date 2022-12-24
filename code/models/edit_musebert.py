@@ -56,7 +56,7 @@ class EditMuseBERT(torch.nn.Module):
 
         # Update the rel_mat and the mask
         rel_mat = torch.zeros(x.shape[0], 4, x.shape[1], x.shape[1])
-        rel_mat[:, :, -100:, -100:] = rel_mat_in
+        rel_mat[:, :, -200:, -200:] = rel_mat_in
         rel_mat = rel_mat.int()
 
         mask = []
@@ -99,7 +99,7 @@ class EditMuseBERT(torch.nn.Module):
 
         # Update the rel_mat and the mask
         rel_mat = torch.zeros(x.shape[0], 4, x.shape[1], x.shape[1])
-        rel_mat[:, :, -100:, -100:] = rel_in
+        rel_mat[:, :, -200:, -200:] = rel_in
         rel_mat = rel_mat.int()
 
         mask = []

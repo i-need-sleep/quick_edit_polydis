@@ -215,13 +215,13 @@ class LoaderWrapper(object):
 # Wrap notes for musebert input
 class Note2MuseBERTConverter():
     def __init__(self):
-        self.pad_length = 100 
+        self.pad_length = 200 
         self.repr_autoenc = NoteAttributeAutoEncoder(**default_autoenc_dict)
 
         # Set up a corruptor that does not corrupt
         corruptor_dict  = {
             'corrupt_col_ids': (1,),
-            'pad_length': 100,
+            'pad_length': 200,
             'mask_ratio': 0.,
             'unchange_ratio': 0.,
             'unknown_ratio': 0.,
@@ -241,8 +241,10 @@ class Note2MuseBERTConverter():
         # Zero-pad the notes up self.pad_length
         notes_len = len(notes)
         if notes_len > self.pad_length:
-            print('TOO LOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOONG!??')
-            raise
+            # print('TOO LOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOONG!??')
+            # raise
+            notes = notes[: self.pad_length]
+            notes_len = self.pad_length
 
         while len(notes) < self.pad_length:
             notes.append([0, 0, 0])
@@ -256,7 +258,7 @@ class Note2MuseBERTConverter():
         try:
             cpt_atrmat, notes_len, inds, _, cpt_relmat = self.corrupter.\
                 compute_relmat_and_corrupt_atrmat_and_relmat(atr_mat, notes_len)
-        except:\
+        except:
             # Dirty fix for rare, empty cases
             cpt_atrmat = atr_mat
             inds = [1],
@@ -267,7 +269,7 @@ class Note2MuseBERTConverter():
 
         return atr_mat.astype(np.int64), cpt_atrmat.astype(np.int64), \
             cpt_relmat.astype(np.int8), mask.astype(np.int8), \
-            inds.astype(bool), notes_len
+            0, notes_len
 
     def generate_attention_mask(self, length):
         mask = np.zeros((self.pad_length, self.pad_length), dtype=np.int8)
