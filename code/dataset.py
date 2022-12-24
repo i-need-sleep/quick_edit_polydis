@@ -126,9 +126,9 @@ class Collate(object):
             notes_out_line, pitch_changes_line, n_inserts_line, inserts_line, decoder_notes_in_line = self.editor.get_edits(notes_rule, notes_polydis)
 
             # Truncate
-            notes_out_line = notes_out_line[: self.converter.pad_length]
-            pitch_changes_line = pitch_changes_line[: self.converter.pad_length]
-            decoder_notes_in_line = decoder_notes_in_line[: self.converter.pad_length]
+            notes_out_line = notes_out_line[: self.converter.pad_length - 1]
+            pitch_changes_line = pitch_changes_line[: self.converter.pad_length - 1]
+            decoder_notes_in_line = decoder_notes_in_line[: self.converter.pad_length - 1]
             
             # The tokens the decoder will predict
             decoder_notes_out_line = self.editor.prep_decoder_notes(inserts_line, decoder_notes_in_line)

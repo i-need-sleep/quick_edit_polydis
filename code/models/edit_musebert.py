@@ -81,7 +81,6 @@ class EditMuseBERT(torch.nn.Module):
                 
             return edits_out_lst, n_inserts_out
 
-        print(x.shape)
         n_inserts_out = self.n_inserts_head(x)[n_inserts_mask > 0]
         edits_out = self.edit_head(x)[edit_mask > 0]
         z_pool = x[:, 0:1, :]
