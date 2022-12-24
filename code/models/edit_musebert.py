@@ -24,7 +24,7 @@ class EditMuseBERT(torch.nn.Module):
         self.n_inserts_head = torch.nn.Linear(128, max_n_inserts) # num of inserts at each onset step
 
         # Chord encoder from Polydis (from scratch)
-        self.chord_enc = RnnEncoder(36, 1024, 128)
+        self.chord_enc = RnnEncoder(36, 1024, 128).to(device)
 
         # Decoder
         self.decoder = MuseBERT.init_model(loss_inds=(0, 1, 2, 3, 4, 5, 6), relation_vocab_sizes=(5, 5, 5, 5), N=n_decoder_layers).to(device)
@@ -40,7 +40,7 @@ class EditMuseBERT(torch.nn.Module):
 
         # Embed the time step tokens (for predicting n_inserts)
         onset_steps = torch.tensor([[i for i in range(32)] for j in range(data_in.shape[0])])
-        onset_embs = self.step_embs(onset_steps)
+        onset_embs = self.step_embs(onset_steps.to(self.device))
 
         # Embed the note atrs
         x = self.encoder.onset_pitch_dur_embedding(data_in)
@@ -68,7 +68,7 @@ class EditMuseBERT(torch.nn.Module):
         mask = torch.stack(mask, dim=0).int()
 
         # Forward pass through the transformer
-        x = self.encoder.tfm(x, rel_mat, mask=mask)
+        x = self.encoder.tfm(x, rel_mat.to(self.device), mask=mask.to(self.device))
 
         if mask_by_line:
             n_inserts_out = self.n_inserts_head(x)[:, 1:33, :]
@@ -110,7 +110,7 @@ class EditMuseBERT(torch.nn.Module):
         mask = torch.stack(mask, dim=0).int()
         
         # Forward pass
-        x = self.decoder.tfm(x, rel_mat, mask=mask)
+        x = self.decoder.tfm(x, rel_mat.to(self.device), mask=mask.to(self.device))
 
         # Decoder atr head
         out = self.decoder.out(x)[:, 1:, :][output_mask > 0]

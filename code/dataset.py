@@ -74,10 +74,10 @@ class EditDatast(Dataset):
 class Collate(object):
     def __init__(self, editor):
         # Load a Polydis model
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.polydis = DisentangleVAE.init_model(device)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.polydis = DisentangleVAE.init_model(self.device)
         model_path = '../pretrained/polydis.pt'  
-        self.polydis.load_model(model_path, map_location=device)
+        self.polydis.load_model(model_path, map_location=self.device)
         self.polydis.eval()
         print(f'Polydis loaded from: {model_path}')
 
@@ -103,8 +103,8 @@ class Collate(object):
                 chords = torch.cat((chords, chords_line), dim=0)
                 
         # Apply Polydis
-        pr_mat = pr_mat.float()
-        chords = chords.float()
+        pr_mat = pr_mat.float().to(self.device)
+        chords = chords.float().to(self.device)
         ptree_polydis = self.polydis.swap(pr_mat, pr_mat, chords, chords, fix_rhy=True, fix_chd=False)
         
         # Process each line

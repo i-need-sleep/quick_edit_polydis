@@ -10,15 +10,15 @@ def prep_batch(batch, device):
     length = batch['length']
 
     # Editor output
-    pitch_changes = torch.tensor(lay_flat(batch['pitch_changes']))
-    n_inserts = torch.tensor(lay_flat(batch['n_inserts']))
+    pitch_changes = torch.tensor(lay_flat(batch['pitch_changes'])).to(device)
+    n_inserts = torch.tensor(lay_flat(batch['n_inserts'])).to(device)
 
     # Decoder
-    decoder_atr_in = torch.tensor(batch['cpt_atr_dec'])
-    decoder_rel_in = torch.tensor(batch['cpt_rel_dec'])
-    decoder_atr_out = torch.tensor(batch['atr_dec'])
+    decoder_atr_in = torch.tensor(batch['cpt_atr_dec']).to(device)
+    decoder_rel_in = torch.tensor(batch['cpt_rel_dec']).to(device)
+    decoder_atr_out = torch.tensor(batch['atr_dec']).to(device)
     decoder_len = batch['length_dec']
-    decoder_output_mask = batch['output_mask_dec']
+    decoder_output_mask = batch['output_mask_dec'].to(device)
     
     decoder_atr_out = decoder_atr_out[decoder_output_mask > 0]
     
