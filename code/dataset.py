@@ -11,6 +11,7 @@ from models.musebert.curriculum_preset import default_autoenc_dict
 import utils.chord_sampler
 import utils.rules
 import utils.edits
+import utils.data_utils
 
 class EditDatast(Dataset):
     def __init__(self, split):
@@ -54,7 +55,7 @@ class EditDatast(Dataset):
             # Randomly sample triads in the root position
             step_method = utils.chord_sampler.random_triad_step
             chords = utils.chord_sampler.gen_chords(step_method)
-        if self.chord_sampling_method == 'any':
+        elif self.chord_sampling_method == 'any':
             # Randomly sample any chord with any chorma at with any bass
             step_method = utils.chord_sampler.random_any_step
             chords = utils.chord_sampler.gen_chords(step_method)
@@ -63,8 +64,10 @@ class EditDatast(Dataset):
             step_method = self.sampler909.draw_chord
             chords = utils.chord_sampler.gen_chords(step_method)
         elif self.chord_sampling_method == '909_prog':
-            # Sample a sequence of chords by their frequency in Pop909
+            # Sample a sequence of chords by their frequency in Pop909\
             chords = self.sampler909.draw_prog()
+        else:
+            raise
 
         return pr_mat, ptree, chords
 
@@ -101,11 +104,14 @@ class Collate(object):
                 
         # Apply Polydis
         pr_mat = pr_mat.float()
+        chords = chords.float()
         ptree_polydis = self.polydis.swap(pr_mat, pr_mat, chords, chords, fix_rhy=True, fix_chd=False)
         
         # Process each line
         notes_out, pitch_changes, n_inserts, inserts = [], [], [], []
         atr, cpt_atr, cpt_rel, mask, inds, length = [], [], [], [], [], []
+        atr_dec, cpt_atr_dec, cpt_rel_dec, length_dec, output_mask_dec = [], [], [], [], []
+        notes_ref = []
         for line_idx in range(pr_mat.shape[0]):
             # Notes after HST
             _, notes_polydis = self.polydis.decoder.grid_to_pr_and_notes(ptree_polydis[line_idx].astype(int))
@@ -119,8 +125,8 @@ class Collate(object):
             # Derive edits 
             notes_out_line, pitch_changes_line, n_inserts_line, inserts_line, decoder_notes_in_line = self.editor.get_edits(notes_rule, notes_polydis)
             
-            # Given inserts, n_inserts and decoder inputs, build input/output tokens
-            decoder_notes_out_line = self.editor.prep_decoder_notes(inserts_line, decoder_notes_in_line) # implement me
+            # The tokens the decoder will predict
+            decoder_notes_out_line = self.editor.prep_decoder_notes(inserts_line, decoder_notes_in_line)
             
             notes_out.append(notes_out_line)
             pitch_changes.append(pitch_changes_line)
@@ -137,14 +143,32 @@ class Collate(object):
             inds.append(inds_l)
             length.append(length_l)
 
+            # Also for the decoder
+            atr_dec_l, cpt_atr_dec_l, cpt_rel_dec_l, length_dec_l, output_mask_dec_l = self.converter.convert_for_decoder(decoder_notes_in_line, decoder_notes_out_line)
+
+            atr_dec.append(atr_dec_l)
+            cpt_atr_dec.append(cpt_atr_dec_l)
+            cpt_rel_dec.append(cpt_rel_dec_l)
+            length_dec.append(length_dec_l)
+            output_mask_dec.append(output_mask_dec_l)
+
             if self.max_n_inserts < max(n_inserts_line):
                 self.max_n_inserts = max(n_inserts_line) # this is around 6 in pop909
+
+            # Output reference
+            notes_ref_line = utils.data_utils.prettymidi_notes_to_onset_pitch_duration(notes_polydis)
+            notes_ref.append(notes_out_line)
                 
         atr = np.array(atr)
         cpt_atr = np.array(cpt_atr)
         cpt_rel = np.array(cpt_rel)
         mask = np.array(mask)
         inds = np.array(inds)
+
+        atr_dec = np.array(atr_dec)
+        cpt_atr_dec = np.array(cpt_atr_dec)
+        cpt_rel_dec = np.array(cpt_rel_dec)
+        output_mask_dec = torch.stack(output_mask_dec, dim=0).squeeze(1)
             
         return {
             'chords': chords,
@@ -159,7 +183,15 @@ class Collate(object):
             'cpt_rel': cpt_rel,
             'mask': mask,
             'inds': inds,
-            'length': length
+            'length': length,
+
+            'atr_dec': atr_dec,
+            'cpt_atr_dec': cpt_atr_dec,
+            'cpt_rel_dec': cpt_rel_dec,
+            'length_dec': length_dec,
+            'output_mask_dec': output_mask_dec,
+
+            'notes_ref': notes_ref
         }
 
 class LoaderWrapper(object):
@@ -197,6 +229,13 @@ class Note2MuseBERTConverter():
         }
         self.corrupter = SimpleCorrupter(**corruptor_dict)
 
+        # atr masking
+        self.unknown_values = (9, 7, 7, 3, 12, 5, 8)
+        self.atr_cols = [2, 3, 4, 5, 6] # Pitches/durations (to be masked as unknown for the decoder ref)
+
+        # rel masking
+        self.rel_mask = 4
+
     def convert(self, notes):
         # Zero-pad the notes up self.pad_length
         notes_len = len(notes)
@@ -213,8 +252,13 @@ class Note2MuseBERTConverter():
         self.corrupter.fast_mode()
         
         atr_mat, notes_len = self.repr_autoenc.encode(notes, notes_len)
-        cpt_atrmat, notes_len, inds, _, cpt_relmat = self.corrupter.\
-            compute_relmat_and_corrupt_atrmat_and_relmat(atr_mat, notes_len)
+        try:
+            cpt_atrmat, notes_len, inds, _, cpt_relmat = self.corrupter.\
+                compute_relmat_and_corrupt_atrmat_and_relmat(atr_mat, notes_len)
+        except:
+            print(notes)
+            print('problem with corruptor')
+            exit()
 
         # square mask to mask out the pad tokens
         mask = self.generate_attention_mask(notes_len)
@@ -227,6 +271,38 @@ class Note2MuseBERTConverter():
         mask = np.zeros((self.pad_length, self.pad_length), dtype=np.int8)
         mask[0: length, 0: length] = 1
         return mask
+
+    def convert_for_decoder(self, context, refs):
+        # Convert the notes for NAR predictions. Mask only the pitch/duration for the ref notes.
+        notes = context + refs
+        notes_len = len(notes)
+        
+        # Build the uncorrupted atr/rel matrices
+        atr, cpt_atr, cpt_rel, _, _, _ = self.convert(notes)
+        
+        # Corrupt cpt_atr. Mark the ref pitch/dur entries as unknown.
+        for idx in range(cpt_atr.shape[0]):
+            if idx >= len(context) and idx < notes_len:
+                for feat_idx in self.atr_cols:
+                    cpt_atr[idx, feat_idx] = self.unknown_values[feat_idx]\
+        
+        # Corrupt cpt_rel.
+        # Onsets (o, o_bt) are known and remain unchanged.
+        # Pitches (p) are masked as unknown *between the the context and ref notes*, ...
+        # ...since the context notes are known and the relative pitches in ref notes can be assumed to avoid ambiguity
+        cpt_rel[1, : len(context), len(context): notes_len] = self.rel_mask
+        cpt_rel[1, len(context): notes_len, : len(context)] = self.rel_mask
+        
+        # Pitch hights (p_ht) is masked for any rel involving a ref note since it is unknown for the ref notes
+        cpt_rel[3, : len(context), len(context): notes_len] = self.rel_mask
+        cpt_rel[3, len(context): notes_len, : notes_len] = self.rel_mask
+
+        # Build an output mask
+        output_mask = torch.zeros(1, self.pad_length)
+        output_mask[0, len(context): notes_len] = 1
+
+        return atr, cpt_atr, cpt_rel, notes_len, output_mask
+
 
 if __name__ == '__main__':
     wrapper = LoaderWrapper(3)

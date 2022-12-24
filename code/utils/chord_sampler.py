@@ -63,12 +63,12 @@ class Sampler909():
     def draw_chord(self):
         prog = self.draw_prog()
         idx = random.randint(0, 7)
-        return torch.tensor(prog[idx, :]).double()
+        return torch.tensor(prog[idx, :]).float()
     
     def draw_prog(self):
         idx = random.randint(0, len(self.dataset))
         _, _, _, _, prog = self.dataset[idx]
-        return torch.tensor(prog).double()
+        return torch.tensor(prog).float()
     
 
 if __name__ == '__main__':
