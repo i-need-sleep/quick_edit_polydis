@@ -1,13 +1,17 @@
 import torch
+import numpy as np
 
 from models.polydis.ptvae import RnnEncoder
 from models.polydis.amc_dl.torch_plus.train_utils import get_zs_from_dists
 from models.musebert.musebert_model import MuseBERT
+from models.musebert.note_attribute_repr import decode_atr_mat_to_nmat
 
 class EditMuseBERT(torch.nn.Module):
-    def __init__(self, device, pretrained_path='../pretrained/musebert.pt', n_edit_types=128, max_n_inserts=16, n_decoder_layers=2):
+    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', n_edit_types=128, max_n_inserts=16, n_decoder_layers=2):
         super(EditMuseBERT, self).__init__()
         
+        self.wrapper = wrapper
+        self.device = device
         self.max_n_inserts = max_n_inserts
         
         # Load a pretrained MuseBERT encoder
@@ -31,7 +35,7 @@ class EditMuseBERT(torch.nn.Module):
         z_chd = get_zs_from_dists([x], False)[0]
         return z_chd
 
-    def encode(self, editor_in, z_chd):
+    def encode(self, editor_in, z_chd, mask_by_line=False):
         [data_in, rel_mat_in, length] = editor_in
 
         # Embed the time step tokens (for predicting n_inserts)
@@ -65,6 +69,16 @@ class EditMuseBERT(torch.nn.Module):
 
         # Forward pass through the transformer
         x = self.encoder.tfm(x, rel_mat, mask=mask)
+
+        if mask_by_line:
+            n_inserts_out = self.n_inserts_head(x)[:, 1:33, :]
+            edits_out = self.edit_head(x)
+            
+            edits_out_lst = []
+            for i in range(edits_out.shape[0]):
+                edits_out_lst.append(edits_out[i][edit_mask[i] > 0])
+                
+            return edits_out_lst, n_inserts_out
 
         n_inserts_out = self.n_inserts_head(x)[n_inserts_mask > 0]
         edits_out = self.edit_head(x)[edit_mask > 0]
@@ -114,3 +128,67 @@ class EditMuseBERT(torch.nn.Module):
         # implement me
         raise
         return
+
+    def inference(self, chd ,editor_in):
+        z_chd = self.encode_chd(chd)
+        edits_out, n_inserts_out = self.encode(editor_in, z_chd, mask_by_line=True)
+
+        decoder_in, decoder_output_mask, context_notes = self.decode_editor_out(edits_out, n_inserts_out, editor_in)
+
+        slices = self.decode(decoder_in, z_chd, decoder_output_mask)
+        
+        inserted_atr = self.slices_to_atr(slices)
+        inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()
+        
+        out = context_notes + inserted_notes
+        return out
+    
+    def slices_to_atr(self, slices):
+        out = [[0 for _ in range(7)] for _ in range(slices[0].shape[0])]
+        for feat_idx, slice in enumerate(slices):
+            inds = torch.max(slice, dim=1).indices.tolist()
+            for step, idx in enumerate(inds):
+                out[step][feat_idx] = idx
+        return out
+
+
+    def decode_editor_out(self, edits_out, n_inserts_out, editor_in):
+
+        [atr, _, length] = editor_in
+        cpt_atr_dec, cpt_rel_dec, length_dec, output_mask_dec = [], [], [], []
+
+        # Let's do this line-by-line
+        for line_idx in range(len(edits_out)):
+
+            # Build the transformed notes
+            notes_context = []
+            nmat_line = decode_atr_mat_to_nmat(atr[line_idx][: length[line_idx]]).tolist()
+            edits_line = torch.max(edits_out[line_idx], dim=1).indices
+
+            for idx, note in enumerate(nmat_line):
+                tar_pitch =  edits_line[idx] 
+                if tar_pitch > 0:
+                    notes_context.append([note[0], tar_pitch.item(), note[2]])
+
+            # Build fake new notes for prediction
+            notes_ref = []
+            n_inserts_line = torch.max(n_inserts_out[line_idx], dim=1).indices
+            for step in range(n_inserts_line.shape[0]):
+                for i in range(n_inserts_line[step].item()):
+                    # Manage the sequence length
+                    if len(notes_ref) + len(notes_context) < self.wrapper.collate.converter.pad_length:
+                        notes_ref.append([step, i+1, 1])
+
+            # Process into decoder input
+            _, cpt_atr_dec_l, cpt_rel_dec_l, length_dec_l, output_mask_dec_l = self.wrapper.collate.converter.convert_for_decoder(notes_context, notes_ref)
+
+            cpt_atr_dec.append(cpt_atr_dec_l)
+            cpt_rel_dec.append(cpt_rel_dec_l)
+            length_dec.append(length_dec_l)
+            output_mask_dec.append(output_mask_dec_l)
+        
+        cpt_atr_dec = np.array(cpt_atr_dec)
+        cpt_rel_dec = np.array(cpt_rel_dec)
+        output_mask_dec = torch.stack(output_mask_dec, dim=0).squeeze(1)
+        
+        return [torch.tensor(cpt_atr_dec).to(self.device), torch.tensor(cpt_rel_dec).to(self.device), length_dec], output_mask_dec, notes_context

@@ -9,7 +9,7 @@ from transformers import AdamW
 
 from dataset import LoaderWrapper
 from models.edit_musebert import EditMuseBERT
-from utils.data_utils import prep_batch
+from utils.data_utils import prep_batch, prep_batch_inference
 
 def train(args):
 
@@ -21,7 +21,7 @@ def train(args):
     print(device)
 
     # Make loaders
-    wrapper = LoaderWrapper(args.batch_size_dev)
+    wrapper = LoaderWrapper(args.batch_size, args.batch_size_dev)
     train_loader = wrapper.get_loader(split='train')
     dev_loader = wrapper.get_loader(split='dev')
 
@@ -30,7 +30,7 @@ def train(args):
     writer = SummaryWriter(log_dir=f'../results/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=f'{args.name}, batch_size={args.batch_size}, Adam_lr_enc={args.lr}, {date_str}')
 
     # Setup training
-    model = EditMuseBERT(device, n_edit_types=wrapper.collate.editor.pitch_range)
+    model = EditMuseBERT(device, wrapper, n_edit_types=wrapper.collate.editor.pitch_range)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Optimizer
@@ -96,7 +96,6 @@ def train(args):
             writer.add_scalar('loss/decoder_loss', decoder_loss, n_iter)
             writer.add_scalar('loss/total_loss', total_loss, n_iter)
             running_loss += total_loss.detach()
-            break
  
         print(f'Epoch: {epoch}')
         epoch_loss = running_loss / (n_iter - n_prev_iter)
@@ -112,11 +111,13 @@ def train(args):
             writer.add_scalar('dev/f1', f1, n_iter)
 
             if f1 > best_f1:
+                best_f1 = f1
                 try:
                     os.makedirs(f'../result/checkpoint/{args.name}')
                 except:
                     pass
                 save_path = f'../result/checkpoint/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{f1}.bin'
+                print(f'Best f1: {best_f1}')
                 print(f'Saving the checkpoint at {save_path}')
                 torch.save({
                     'epoch': epoch,
@@ -136,31 +137,40 @@ def eval(model, loader, device):
 
         for idx, batch in enumerate(loader):
             
-            chd, editor_in, notes_ref = prep_batch(batch, device)
+            chd, editor_in, notes_ref = prep_batch_inference(batch, device)
             notes_pred = model.inference(chd, editor_in)
-            exit()
 
-            # Eval for f1
-            
-            
-        if n_rels_pred == 0:
-            n_rels_pred = 1
-        if n_rels_true == 0:
-            n_rels_true = 1
-        prec = n_rels_hit / n_rels_pred
-        recall = n_rels_hit / n_rels_true
+            n_pred += len(notes_pred)
+            n_ref += len(notes_ref)
+            n_hit = eval_notes_hits(notes_pred, notes_ref)
+
+        # Eval for f1
+        if n_pred == 0:
+            n_pred = 1
+        if n_ref == 0:
+            n_ref = 1
+        prec = n_hit / n_pred
+        recall = n_hit / n_ref
         if prec > 0 and recall > 0:
             f1 = 2/(1/prec + 1/recall)
         else:
             f1 = 0
-        print(f'#pred: {n_rels_pred}, #true:{n_rels_true}, #hits:{n_rels_hit}')
+        print(f'#pred: {n_pred}, #true:{n_ref}, #hits:{n_hit}')
         print(f'F1: {f1}, prec: {prec}, recall: {recall}')
         
-        if write_answer != '':
-            with open(f'../result/output/{write_answer}.json', 'w') as f:
-                json.dump(write_answer_out, f)
-
         return prec, recall, f1
+
+def eval_notes_hits(notes_pred, notes_ref):
+    n_hits = 0
+    for note_pred in notes_pred:
+        [start, pitch, dur] = note_pred
+        for i in range(len(notes_ref)):
+            note_ref = notes_ref[i]
+            if note_ref[0] == start and note_ref[1] == pitch and note_ref[2] == dur:
+                n_hits += 1
+                notes_ref.pop(i)
+                break
+    return n_hits
 
 if __name__ == '__main__':
 

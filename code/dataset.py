@@ -157,7 +157,7 @@ class Collate(object):
 
             # Output reference
             notes_ref_line = utils.data_utils.prettymidi_notes_to_onset_pitch_duration(notes_polydis)
-            notes_ref.append(notes_out_line)
+            notes_ref.append(notes_ref_line)
                 
         atr = np.array(atr)
         cpt_atr = np.array(cpt_atr)
@@ -195,14 +195,14 @@ class Collate(object):
         }
 
 class LoaderWrapper(object):
-    def __init__(self, batch_size, shuffle=True):
+    def __init__(self, batch_size, batch_size_dev, shuffle=True):
         self.editor = utils.edits.DefaultEditSet()
         self.collate = Collate(self.editor)
         self.train_set = EditDatast('train')
         self.dev_set = EditDatast('dev')
 
         self.train_loader = DataLoader(self.train_set, batch_size=batch_size, collate_fn=self.collate, shuffle=shuffle)
-        self.dev_loader = DataLoader(self.dev_set, batch_size=batch_size, collate_fn=self.collate, shuffle=shuffle)
+        self.dev_loader = DataLoader(self.dev_set, batch_size=batch_size_dev, collate_fn=self.collate, shuffle=shuffle)
 
     def get_loader(self, split):
         if split == 'train':
@@ -305,7 +305,9 @@ class Note2MuseBERTConverter():
 
 
 if __name__ == '__main__':
-    wrapper = LoaderWrapper(3)
+    import tqdm
+    wrapper = LoaderWrapper(3, 3)
     loader = wrapper.get_loader('train')
-    for batch in loader:
-        break
+    for batch in tqdm.tqdm(loader):
+        continue
+    print('done')
