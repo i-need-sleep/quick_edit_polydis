@@ -237,6 +237,7 @@ class Note2MuseBERTConverter():
         self.rel_mask = 4
 
     def convert(self, notes):
+
         # Zero-pad the notes up self.pad_length
         notes_len = len(notes)
         if notes_len > self.pad_length:
@@ -255,10 +256,11 @@ class Note2MuseBERTConverter():
         try:
             cpt_atrmat, notes_len, inds, _, cpt_relmat = self.corrupter.\
                 compute_relmat_and_corrupt_atrmat_and_relmat(atr_mat, notes_len)
-        except:
-            print(notes)
-            print('problem with corruptor')
-            exit()
+        except:\
+            # Dirty fix for rare, empty cases
+            cpt_atrmat = atr_mat
+            inds = [1],
+            cpt_relmat = np.zeros((4, self.pad_length, self.pad_length))
 
         # square mask to mask out the pad tokens
         mask = self.generate_attention_mask(notes_len)
