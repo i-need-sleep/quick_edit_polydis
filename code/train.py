@@ -177,8 +177,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--name', default='unnamed')
 
-    parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--batch_size_dev', default=16, type=int)
+    parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--batch_size_dev', default=32, type=int)
     parser.add_argument('--lr', default=1e-6, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str) 
