@@ -12,6 +12,7 @@ class EditMuseBERT(torch.nn.Module):
         
         self.wrapper = wrapper
         self.device = device
+        self.pad_len = self.wrapper.collate.converter.pad_length
         self.max_n_inserts = max_n_inserts
         
         # Load a pretrained MuseBERT encoder
@@ -56,7 +57,7 @@ class EditMuseBERT(torch.nn.Module):
 
         # Update the rel_mat and the mask
         rel_mat = torch.zeros(x.shape[0], 4, x.shape[1], x.shape[1])
-        rel_mat[:, :, -200:, -200:] = rel_mat_in
+        rel_mat[:, :, -self.pad_len:, -self.pad_len:] = rel_mat_in
         rel_mat = rel_mat.int()
 
         mask = []
@@ -80,6 +81,7 @@ class EditMuseBERT(torch.nn.Module):
                 
             return edits_out_lst, n_inserts_out
 
+        print(x.shape)
         n_inserts_out = self.n_inserts_head(x)[n_inserts_mask > 0]
         edits_out = self.edit_head(x)[edit_mask > 0]
         z_pool = x[:, 0:1, :]
@@ -99,7 +101,7 @@ class EditMuseBERT(torch.nn.Module):
 
         # Update the rel_mat and the mask
         rel_mat = torch.zeros(x.shape[0], 4, x.shape[1], x.shape[1])
-        rel_mat[:, :, -200:, -200:] = rel_in
+        rel_mat[:, :, -self.pad_len:, -self.pad_len:] = rel_in
         rel_mat = rel_mat.int()
 
         mask = []

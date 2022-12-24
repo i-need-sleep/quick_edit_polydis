@@ -124,9 +124,17 @@ class Collate(object):
 
             # Derive edits 
             notes_out_line, pitch_changes_line, n_inserts_line, inserts_line, decoder_notes_in_line = self.editor.get_edits(notes_rule, notes_polydis)
+
+            # Truncate
+            notes_out_line = notes_out_line[: self.converter.pad_length]
+            pitch_changes_line = pitch_changes_line[: self.converter.pad_length]
+            decoder_notes_in_line = decoder_notes_in_line[: self.converter.pad_length]
             
             # The tokens the decoder will predict
             decoder_notes_out_line = self.editor.prep_decoder_notes(inserts_line, decoder_notes_in_line)
+
+            # Truncate
+            decoder_notes_out_line = decoder_notes_out_line[: self.converter.pad_length - len(decoder_notes_in_line)]
             
             notes_out.append(notes_out_line)
             pitch_changes.append(pitch_changes_line)
@@ -216,12 +224,17 @@ class LoaderWrapper(object):
 class Note2MuseBERTConverter():
     def __init__(self):
         self.pad_length = 200 
+
+        autoenc_dict = default_autoenc_dict
+        autoenc_dict['nmat_pad_length'] = self.pad_length
+        autoenc_dict['atr_mat_pad_length'] = self.pad_length
+
         self.repr_autoenc = NoteAttributeAutoEncoder(**default_autoenc_dict)
 
         # Set up a corruptor that does not corrupt
         corruptor_dict  = {
             'corrupt_col_ids': (1,),
-            'pad_length': 200,
+            'pad_length': self.pad_length,
             'mask_ratio': 0.,
             'unchange_ratio': 0.,
             'unknown_ratio': 0.,
@@ -241,10 +254,8 @@ class Note2MuseBERTConverter():
         # Zero-pad the notes up self.pad_length
         notes_len = len(notes)
         if notes_len > self.pad_length:
-            # print('TOO LOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOONG!??')
-            # raise
-            notes = notes[: self.pad_length]
-            notes_len = self.pad_length
+            print('TOO LOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOONG!??')
+            raise
 
         while len(notes) < self.pad_length:
             notes.append([0, 0, 0])
@@ -259,10 +270,13 @@ class Note2MuseBERTConverter():
             cpt_atrmat, notes_len, inds, _, cpt_relmat = self.corrupter.\
                 compute_relmat_and_corrupt_atrmat_and_relmat(atr_mat, notes_len)
         except:
-            # Dirty fix for rare, empty cases
-            cpt_atrmat = atr_mat
-            inds = [1],
-            cpt_relmat = np.zeros((4, self.pad_length, self.pad_length))
+            if notes_len == 0:
+                # Dirty fix for rare, empty cases
+                cpt_atrmat = atr_mat
+                inds = [1],
+                cpt_relmat = np.zeros((4, self.pad_length, self.pad_length))
+            else:
+                raise
 
         # square mask to mask out the pad tokens
         mask = self.generate_attention_mask(notes_len)

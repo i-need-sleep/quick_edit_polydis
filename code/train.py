@@ -29,7 +29,7 @@ def train(args):
     writer = SummaryWriter(log_dir=f'../results/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=f'{args.name}, batch_size={args.batch_size}, Adam_lr_enc={args.lr}, {date_str}')
 
     # Setup training
-    model = EditMuseBERT(device, wrapper, n_edit_types=wrapper.collate.editor.pitch_range).to(device)
+    model = EditMuseBERT(device, wrapper,n_edit_types=wrapper.collate.editor.pitch_range).to(device)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Optimizer
