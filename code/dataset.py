@@ -327,6 +327,10 @@ if __name__ == '__main__':
     import tqdm
     wrapper = LoaderWrapper(3, 3)
     loader = wrapper.get_loader('train')
-    for batch in tqdm.tqdm(loader):
-        continue
+    # for batch in tqdm.tqdm(loader):
+    #     continue
+    notes = [[1, 2, 3]]
+    print(notes)
+    out = wrapper.collate.converter.convert(notes)
+    print(out)
     print('done')
