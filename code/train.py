@@ -99,8 +99,8 @@ def train(args):
             writer.add_scalar('loss/total_loss', total_loss, n_iter)
             running_loss += total_loss.detach()
 
-            if n_iter % 1000 == 0:
-                pritn(n_iter)
+            if n_iter % 100 == 0:
+                print(n_iter)
  
                 step_loss = running_loss / (n_iter - n_prev_iter)
                 print(f'Training loss: {step_loss}')

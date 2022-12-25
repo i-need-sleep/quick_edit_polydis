@@ -156,6 +156,7 @@ class EditMuseBERT(torch.nn.Module):
     def decode_editor_out(self, edits_out, n_inserts_out, editor_in):
 
         [atr, _, length] = editor_in
+        atr = atr.cpu()
         cpt_atr_dec, cpt_rel_dec, length_dec, output_mask_dec = [], [], [], []
 
         # Let's do this line-by-line
