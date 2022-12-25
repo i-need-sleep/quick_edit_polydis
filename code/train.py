@@ -23,6 +23,9 @@ def train(args):
     wrapper = LoaderWrapper(args.batch_size, args.batch_size_dev)
     train_loader = wrapper.get_loader(split='train')
     dev_loader = wrapper.get_loader(split='dev')
+    print(f'Training laoder size: {len(train_loader)}')
+    print(f'Dev laoder size: {len(dev_loader)}')
+    print(f'Dev #songs: {- dev_loader.dataset.split_idx}')
 
     # Setup Tensorboard
     date_str = str(datetime.datetime.now())[:-7].replace(':','-')
@@ -95,36 +98,37 @@ def train(args):
             writer.add_scalar('loss/decoder_loss', decoder_loss, n_iter)
             writer.add_scalar('loss/total_loss', total_loss, n_iter)
             running_loss += total_loss.detach()
+
+            if n_iter % 1000 == 0:
+                pritn(n_iter)
  
-        print(f'Epoch: {epoch}')
-        epoch_loss = running_loss / (n_iter - n_prev_iter)
-        print(f'Training loss: {epoch_loss}')
-        writer.add_scalar('loss/epoch_loss', epoch_loss, n_iter)
-        n_prev_iter = n_iter
-        running_loss = 0
+                step_loss = running_loss / (n_iter - n_prev_iter)
+                print(f'Training loss: {step_loss}')
+                n_prev_iter = n_iter
+                running_loss = 0
 
-        if epoch % 1 == 0:
-            prec, recall, f1 = eval(model, dev_loader, device)
-            writer.add_scalar('dev/prec', prec, n_iter)
-            writer.add_scalar('dev/recall', recall, n_iter)
-            writer.add_scalar('dev/f1', f1, n_iter)
+            if n_iter % 5000 == 0:
+                prec, recall, f1 = eval(model, dev_loader, device)
+                writer.add_scalar('dev/prec', prec, n_iter)
+                writer.add_scalar('dev/recall', recall, n_iter)
+                writer.add_scalar('dev/f1', f1, n_iter)
 
-            if f1 > best_f1:
-                best_f1 = f1
-                try:
-                    os.makedirs(f'../result/checkpoint/{args.name}')
-                except:
-                    pass
-                save_path = f'../result/checkpoint/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{f1}.bin'
-                print(f'Best f1: {best_f1}')
-                print(f'Saving the checkpoint at {save_path}')
-                torch.save({
-                    'epoch': epoch,
-                    'step': n_iter,
-                    'model_state_dict': model.state_dict(),
-                    'optimiser_state_dict': optimiser.state_dict(),
-                    }, save_path)
-                
+                if f1 > best_f1:
+                    best_f1 = f1
+                    try:
+                        os.makedirs(f'../result/checkpoint/{args.name}')
+                    except:
+                        pass
+                    save_path = f'../result/checkpoint/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{f1}.bin'
+                    print(f'Best f1: {best_f1}')
+                    print(f'Saving the checkpoint at {save_path}')
+                    torch.save({
+                        'epoch': epoch,
+                        'step': n_iter,
+                        'model_state_dict': model.state_dict(),
+                        'optimiser_state_dict': optimiser.state_dict(),
+                        }, save_path)
+                    
     print('DONE !!!')
 
 def eval(model, loader, device):
@@ -177,8 +181,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--name', default='unnamed')
 
-    parser.add_argument('--batch_size', default=64, type=int)
-    parser.add_argument('--batch_size_dev', default=32, type=int)
+    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size_dev', default=16, type=int)
     parser.add_argument('--lr', default=1e-6, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str) 

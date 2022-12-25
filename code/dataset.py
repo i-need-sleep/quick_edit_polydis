@@ -25,11 +25,11 @@ class EditDatast(Dataset):
         # Split the polydis dataset
         # For now, select the last 80 songs. Remember to create a proper index file later with random selection.
         fns = dtst.collect_data_fns()
-        split_idx = -80
+        self.split_idx = -40
         if split == 'train':
-            range = np.arange(len(fns))[: split_idx]
+            range = np.arange(len(fns))[: self.split_idx]
         elif split == 'dev':
-            range = np.arange(len(fns))[split_idx: ]
+            range = np.arange(len(fns))[self.split_idx: ]
         else:
             raise
 
@@ -126,9 +126,9 @@ class Collate(object):
             notes_out_line, pitch_changes_line, n_inserts_line, inserts_line, decoder_notes_in_line = self.editor.get_edits(notes_rule, notes_polydis)
 
             # Truncate
-            notes_out_line = notes_out_line[: self.converter.pad_length - 1]
-            pitch_changes_line = pitch_changes_line[: self.converter.pad_length - 1]
-            decoder_notes_in_line = decoder_notes_in_line[: self.converter.pad_length - 1]
+            notes_out_line = notes_out_line[: self.converter.pad_length - 2]
+            pitch_changes_line = pitch_changes_line[: self.converter.pad_length - 2]
+            decoder_notes_in_line = decoder_notes_in_line[: self.converter.pad_length - 2]
             
             # The tokens the decoder will predict
             decoder_notes_out_line = self.editor.prep_decoder_notes(inserts_line, decoder_notes_in_line)
@@ -266,16 +266,17 @@ class Note2MuseBERTConverter():
         self.corrupter.fast_mode()
         
         atr_mat, notes_len = self.repr_autoenc.encode(notes, notes_len)
-        try:
-            cpt_atrmat, notes_len, inds, _, cpt_relmat = self.corrupter.\
-                compute_relmat_and_corrupt_atrmat_and_relmat(atr_mat, notes_len)
-        except:
-            if notes_len == 0:
-                # Dirty fix for rare, empty cases
-                cpt_atrmat = atr_mat
-                inds = [1],
-                cpt_relmat = np.zeros((4, self.pad_length, self.pad_length))
-            else:
+        if notes_len < 2:
+            # Dirty fix for rare, empty cases
+            cpt_atrmat = atr_mat
+            inds = [1],
+            cpt_relmat = np.zeros((4, self.pad_length, self.pad_length))
+        else:
+            try:
+                cpt_atrmat, notes_len, inds, _, cpt_relmat = self.corrupter.\
+                    compute_relmat_and_corrupt_atrmat_and_relmat(atr_mat, notes_len)
+            except:
+                print(notes)
                 raise
 
         # square mask to mask out the pad tokens
