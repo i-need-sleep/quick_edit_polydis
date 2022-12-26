@@ -107,15 +107,15 @@ def train(args):
                 n_prev_iter = n_iter
                 running_loss = 0
 
-            if n_iter % 5000 == 0:
+            if n_iter % 5000 == 0 or n_iter==1:
                 try:
                     prec, recall, f1 = eval(model, dev_loader, device)
                     writer.add_scalar('dev/prec', prec, n_iter)
                     writer.add_scalar('dev/recall', recall, n_iter)
                     writer.add_scalar('dev/f1', f1, n_iter)
                 except:
-                    print('eval died...')
-                    f1 = 100
+                    print('eval died!!')
+                    f1 = best_f1 + 1e-10
 
                 if f1 > best_f1:
                     best_f1 = f1
@@ -136,7 +136,7 @@ def train(args):
     print('DONE !!!')
 
 def eval(model, loader, device):
-    loader.dataset.chord_sampling_method = '909_chord'
+    loader.dataset.chord_sampling_method = '909_prog'
     
     model.eval()
     with torch.no_grad():
@@ -186,8 +186,8 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='unnamed')
 
     parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--batch_size_dev', default=16, type=int)
-    parser.add_argument('--lr', default=1e-6, type=float)
+    parser.add_argument('--batch_size_dev', default=1, type=int)
+    parser.add_argument('--lr', default=1e-5, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str) 
 

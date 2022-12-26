@@ -7,7 +7,7 @@ from models.musebert.musebert_model import MuseBERT
 from models.musebert.note_attribute_repr import decode_atr_mat_to_nmat
 
 class EditMuseBERT(torch.nn.Module):
-    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', n_edit_types=128, max_n_inserts=16, n_decoder_layers=2):
+    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', n_edit_types=128, max_n_inserts=16, n_decoder_layers=3):
         super(EditMuseBERT, self).__init__()
         
         self.wrapper = wrapper
@@ -136,31 +136,29 @@ class EditMuseBERT(torch.nn.Module):
 
         decoder_in, decoder_output_mask, context_notes = self.decode_editor_out(edits_out, n_inserts_out, editor_in)
 
-        slices, lengths = self.decode(decoder_in, z_chd, decoder_output_mask)
+        slices = self.decode(decoder_in, z_chd, decoder_output_mask) 
+        # All notes are pooled into a long sequence
+        # TODO: Make this compatible with batches
         
         inserted_atr = self.slices_to_atr(slices)
-
-        inserted_notes = self.atr_to_notes(inserted_atr, lengths)
+        if len(inserted_atr) == 0:
+            inserted_notes = []
+        elif len(inserted_atr) == 1:
+            inserted_atr *= 2
+            inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()[: 1]
+        else:
+            inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()
         
         out = context_notes + inserted_notes
-        return out
-
-    def atr_to_notes(inserted_atr, lengths):
-        out = []
-        for i in range(len(lengths)):
-            notes = decode_atr_mat_to_nmat(np.array(inserted_atr[i]), length=lengths[i]).tolist()
-            out.append(notes)
         return out
     
     def slices_to_atr(self, slices):
         out = [[0 for _ in range(7)] for _ in range(slices[0].shape[0])]
-        lengths = []
         for feat_idx, slice in enumerate(slices):
             inds = torch.max(slice, dim=1).indices.tolist()
             for step, idx in enumerate(inds):
                 out[step][feat_idx] = idx
-            lengths.append(len(slice))
-        return out, lengths
+        return out
 
 
     def decode_editor_out(self, edits_out, n_inserts_out, editor_in):
