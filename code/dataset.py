@@ -87,6 +87,7 @@ class Collate(object):
 
         # Converter to MuseBERT's input format
         self.converter = Note2MuseBERTConverter()
+        self.rule = utils.rules.nearest_neighbour
 
     def __call__(self, batch):
         # Stack the batch
@@ -120,7 +121,7 @@ class Collate(object):
             _, notes = self.polydis.decoder.grid_to_pr_and_notes(ptree[line_idx].numpy().astype(int))
 
             # Apply rule-based approximations to the input notes
-            notes_rule = utils.rules.nearest_neighbour(notes, chords[line_idx])
+            notes_rule = self.rule(notes, chords[line_idx])
 
             # Derive edits 
             notes_out_line, pitch_changes_line, n_inserts_line, inserts_line, decoder_notes_in_line = self.editor.get_edits(notes_rule, notes_polydis)

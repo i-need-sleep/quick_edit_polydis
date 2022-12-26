@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from dataset import LoaderWrapper
 from models.edit_musebert import EditMuseBERT
 from utils.data_utils import prep_batch, prep_batch_inference
+import utils.rules
 
 def train(args):
 
@@ -26,6 +27,10 @@ def train(args):
     print(f'Training laoder size: {len(train_loader)}')
     print(f'Dev laoder size: {len(dev_loader)}')
     print(f'Dev #songs: {- dev_loader.dataset.split_idx}')
+
+    # Set the rule set
+    if args.identity_rule:
+        wrapper.collate.rule = utils.rules.identity
 
     # Setup Tensorboard
     date_str = str(datetime.datetime.now())[:-7].replace(':','-')
@@ -190,6 +195,9 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=1e-5, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str) 
+
+    # Rules
+    parser.add_argument('--identity_rule', action='store_true')
 
     args = parser.parse_args()
 
