@@ -136,21 +136,31 @@ class EditMuseBERT(torch.nn.Module):
 
         decoder_in, decoder_output_mask, context_notes = self.decode_editor_out(edits_out, n_inserts_out, editor_in)
 
-        slices = self.decode(decoder_in, z_chd, decoder_output_mask)
+        slices, lengths = self.decode(decoder_in, z_chd, decoder_output_mask)
         
         inserted_atr = self.slices_to_atr(slices)
-        inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()
+
+        inserted_notes = self.atr_to_notes(inserted_atr, lengths)
         
         out = context_notes + inserted_notes
+        return out
+
+    def atr_to_notes(inserted_atr, lengths):
+        out = []
+        for i in range(len(lengths)):
+            notes = decode_atr_mat_to_nmat(np.array(inserted_atr[i]), length=lengths[i]).tolist()
+            out.append(notes)
         return out
     
     def slices_to_atr(self, slices):
         out = [[0 for _ in range(7)] for _ in range(slices[0].shape[0])]
+        lengths = []
         for feat_idx, slice in enumerate(slices):
             inds = torch.max(slice, dim=1).indices.tolist()
             for step, idx in enumerate(inds):
                 out[step][feat_idx] = idx
-        return out
+            lengths.append(len(slice))
+        return out, lengths
 
 
     def decode_editor_out(self, edits_out, n_inserts_out, editor_in):

@@ -15,7 +15,7 @@ def train(args):
     print(args)
 
     # Device
-    # torch.manual_seed(21)
+    torch.manual_seed(21)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(device)
 
@@ -108,15 +108,19 @@ def train(args):
                 running_loss = 0
 
             if n_iter % 5000 == 0:
-                prec, recall, f1 = eval(model, dev_loader, device)
-                writer.add_scalar('dev/prec', prec, n_iter)
-                writer.add_scalar('dev/recall', recall, n_iter)
-                writer.add_scalar('dev/f1', f1, n_iter)
+                try:
+                    prec, recall, f1 = eval(model, dev_loader, device)
+                    writer.add_scalar('dev/prec', prec, n_iter)
+                    writer.add_scalar('dev/recall', recall, n_iter)
+                    writer.add_scalar('dev/f1', f1, n_iter)
+                except:
+                    print('eval died...')
+                    f1 = 100
 
                 if f1 > best_f1:
                     best_f1 = f1
                     try:
-                        os.makedirs(f'../result/checkpoint/{args.name}')
+                        os.makedirs(f'../results/checkpoint/{args.name}')
                     except:
                         pass
                     save_path = f'../result/checkpoint/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{f1}.bin'
