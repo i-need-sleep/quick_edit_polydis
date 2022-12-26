@@ -120,7 +120,7 @@ def train(args):
                 if f1 > best_f1:
                     best_f1 = f1
                     try:
-                        os.makedirs(f'../results/checkpoint/{args.name}')
+                        os.makedirs(f'../results/checkpoints/{args.name}')
                     except:
                         pass
                     save_path = f'../result/checkpoint/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{f1}.bin'
