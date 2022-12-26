@@ -66,7 +66,7 @@ class Sampler909():
         return torch.tensor(prog[idx, :]).float()
     
     def draw_prog(self):
-        idx = random.randint(0, len(self.dataset))
+        idx = random.randint(0, len(self.dataset) - 1)
         _, _, _, _, prog = self.dataset[idx]
         return torch.tensor(prog).float()
     
