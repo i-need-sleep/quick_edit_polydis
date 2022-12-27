@@ -132,7 +132,7 @@ def train(args):
                     os.makedirs(f'../results/checkpoints/{args.name}')
                 except:
                     pass
-                save_path = f'../result/checkpoint/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{best_f1}.bin'
+                save_path = f'../results/checkpoints/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{best_f1}.bin'
                 print(f'Best f1: {best_f1}')
                 print(f'Saving the checkpoint at {save_path}')
                 torch.save({
