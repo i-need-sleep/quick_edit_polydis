@@ -122,33 +122,35 @@ def train(args):
                 n_prev_iter = n_iter
                 running_loss = 0
 
-            if n_iter % 6000 == 0 or args.debug:
+            if n_iter % 5000 == 0 or args.debug:
                 if args.debug:
                     prec, recall, f1 = eval(model, dev_loader, device)
+
+                if f1 > best_f1:
+                    best_f1 = f1
+                try:
+                    os.makedirs(f'../results/checkpoints/{args.name}')
+                except:
+                    pass
+                save_path = f'../result/checkpoint/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{best_f1}.bin'
+                print(f'Best f1: {best_f1}')
+                print(f'Saving the checkpoint at {save_path}')
+                torch.save({
+                    'epoch': epoch,
+                    'step': n_iter,
+                    'model_state_dict': model.state_dict(),
+                    'optimiser_state_dict': optimiser.state_dict(),
+                    }, save_path)
+
                 try:
                     prec, recall, f1 = eval(model, dev_loader, device)
                     writer.add_scalar('dev/prec', prec, n_iter)
                     writer.add_scalar('dev/recall', recall, n_iter)
                     writer.add_scalar('dev/f1', f1, n_iter)
+                    print(f'F1: {f1}')
                 except:
                     print('eval died!!')
                     f1 = best_f1 + 1e-10
-
-                if f1 > best_f1:
-                    best_f1 = f1
-                    try:
-                        os.makedirs(f'../results/checkpoints/{args.name}')
-                    except:
-                        pass
-                    save_path = f'../result/checkpoint/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{f1}.bin'
-                    print(f'Best f1: {best_f1}')
-                    print(f'Saving the checkpoint at {save_path}')
-                    torch.save({
-                        'epoch': epoch,
-                        'step': n_iter,
-                        'model_state_dict': model.state_dict(),
-                        'optimiser_state_dict': optimiser.state_dict(),
-                        }, save_path)
                     
     print('DONE !!!')
 
@@ -206,7 +208,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--batch_size', default=48, type=int)
     parser.add_argument('--batch_size_dev', default=32, type=int)
-    parser.add_argument('--lr', default=1e-4, type=float)
+    parser.add_argument('--lr', default=1e-3, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str) 
 
