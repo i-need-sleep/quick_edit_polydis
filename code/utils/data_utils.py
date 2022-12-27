@@ -35,7 +35,7 @@ def prep_batch_inference(batch, device, ref=True):
 
     notes_ref = []
     if ref:
-        notes_ref = lay_flat(batch['notes_ref'])
+        notes_ref = batch['notes_ref']
     
     return chd, [atr, cpt_rel, length], notes_ref
 

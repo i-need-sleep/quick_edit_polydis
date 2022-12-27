@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import numpy as np
 
@@ -87,7 +89,7 @@ class EditMuseBERT(torch.nn.Module):
         
         return z_pool, edits_out, n_inserts_out
 
-    def decode(self, decoder_in, z_chd, output_mask):
+    def decode(self, decoder_in, z_chd, output_mask, per_line=False):
 
         [atr_in, rel_in, length] = decoder_in
 
@@ -114,16 +116,35 @@ class EditMuseBERT(torch.nn.Module):
         x = self.decoder.tfm(x, rel_mat.to(self.device), mask=mask.to(self.device))
 
         # Decoder atr head
-        out = self.decoder.out(x)[:, 1:, :][output_mask > 0]
+        out = self.decoder.out(x)[:, 1:, :]
+        
+        # Pool everything into a sequence
+        if not per_line:
+            out = out[output_mask > 0]
 
-        # Slice the outputs
-        slices = []
-        start = 0
-        for i, size in enumerate(self.decoder_splits):
-            slices.append(out[:, start: start + size])
-            start += size
+            # Slice the outputs
+            slices = []
+            start = 0
+            for i, size in enumerate(self.decoder_splits):
+                slices.append(out[:, start: start + size])
+                start += size
 
-        return slices
+            return slices
+        
+        # Output a set of slices per line
+        else:
+            slicess = []
+            for i in range(out.shape[0]):
+                line_out = out[i][output_mask[i] > 0]
+                slices = []
+                start = 0
+                for j, size in enumerate(self.decoder_splits):
+                    slices.append(line_out[:, start: start + size])
+                    start += size
+                slicess.append(slices)
+
+            return slicess
+
         
     def forward(self):
         # implement me
@@ -136,20 +157,21 @@ class EditMuseBERT(torch.nn.Module):
 
         decoder_in, decoder_output_mask, context_notes = self.decode_editor_out(edits_out, n_inserts_out, editor_in)
 
-        slices = self.decode(decoder_in, z_chd, decoder_output_mask) 
-        # All notes are pooled into a long sequence
-        # TODO: Make this compatible with batches
+        slicess = self.decode(decoder_in, z_chd, decoder_output_mask, per_line=True)
         
-        inserted_atr = self.slices_to_atr(slices)
-        if len(inserted_atr) == 0:
-            inserted_notes = []
-        elif len(inserted_atr) == 1:
-            inserted_atr *= 2
-            inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()[: 1]
-        else:
-            inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()
+        out = []
+        for i, slices in enumerate(slicess):
         
-        out = context_notes + inserted_notes
+            inserted_atr = self.slices_to_atr(slices)
+            if len(inserted_atr) == 0:
+                inserted_notes = []
+            elif len(inserted_atr) == 1:
+                inserted_atr *= 2
+                inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()[: 1]
+            else:
+                inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()
+        
+            out.append(context_notes[i] + inserted_notes)
         return out
     
     def slices_to_atr(self, slices):
@@ -165,20 +187,35 @@ class EditMuseBERT(torch.nn.Module):
 
         [atr, _, length] = editor_in
         atr = atr.cpu()
-        cpt_atr_dec, cpt_rel_dec, length_dec, output_mask_dec = [], [], [], []
+        cpt_atr_dec, cpt_rel_dec, length_dec, output_mask_dec, notes_context = [], [], [], [], []
 
         # Let's do this line-by-line
         for line_idx in range(len(edits_out)):
 
             # Build the transformed notes
-            notes_context = []
+            notes_context_line = []
             nmat_line = decode_atr_mat_to_nmat(atr[line_idx][: length[line_idx]]).tolist()
-            edits_line = torch.max(edits_out[line_idx], dim=1).indices
+            edits_line = edits_out[line_idx]
 
-            for idx, note in enumerate(nmat_line):
-                tar_pitch =  edits_line[idx] 
-                if tar_pitch > 0:
-                    notes_context.append([note[0], tar_pitch.item(), note[2]])
+            # Since we predict pitch changes with soft labels, we have to do a softmax over all note groups with the same onset/dur
+            # Do this note-by-note.
+            processed_inds = []
+            for idx in range(len(nmat_line)):
+                if idx not in processed_inds:
+                    inds = self._find_indices(nmat_line, idx)
+                    processed_inds += inds
+                    cur_logits = edits_line[inds]
+                    cur_probs = torch.nn.Softmax(dim=0)(cur_logits)
+                    for i, ind in enumerate(inds):
+                        # Find the highest prob
+                        highest_idx = torch.max(cur_probs, dim=1).indices[i].item()
+
+                        # Add the new pitch-changed note
+                        if highest_idx > 0:
+                            notes_context_line.append([nmat_line[ind][0], highest_idx, nmat_line[ind][2]])
+
+                        # Adjust the probs
+                        cur_probs[:, highest_idx] -= 1 / len(inds)
 
             # Build fake new notes for prediction
             notes_ref = []
@@ -186,19 +223,30 @@ class EditMuseBERT(torch.nn.Module):
             for step in range(n_inserts_line.shape[0]):
                 for i in range(n_inserts_line[step].item()):
                     # Manage the sequence length
-                    if len(notes_ref) + len(notes_context) < self.wrapper.collate.converter.pad_length:
+                    if len(notes_ref) + len(notes_context_line) < self.wrapper.collate.converter.pad_length:
                         notes_ref.append([step, i+1, 1])
 
             # Process into decoder input
-            _, cpt_atr_dec_l, cpt_rel_dec_l, length_dec_l, output_mask_dec_l = self.wrapper.collate.converter.convert_for_decoder(notes_context, notes_ref)
+            _, cpt_atr_dec_l, cpt_rel_dec_l, length_dec_l, output_mask_dec_l = self.wrapper.collate.converter.convert_for_decoder(notes_context_line, notes_ref)
 
             cpt_atr_dec.append(cpt_atr_dec_l)
             cpt_rel_dec.append(cpt_rel_dec_l)
             length_dec.append(length_dec_l)
             output_mask_dec.append(output_mask_dec_l)
+            notes_context.append(notes_context_line)
         
         cpt_atr_dec = np.array(cpt_atr_dec)
         cpt_rel_dec = np.array(cpt_rel_dec)
         output_mask_dec = torch.stack(output_mask_dec, dim=0).squeeze(1)
         
         return [torch.tensor(cpt_atr_dec).to(self.device), torch.tensor(cpt_rel_dec).to(self.device), length_dec], output_mask_dec, notes_context
+
+    def _find_indices(self, notes, i):
+        # Given a nmat, find the indices of all notes with the same onset/duration as notes[i] (including i)
+        onset = notes[i][0]
+        dur = notes[i][2]
+        out = []
+        for idx, note in enumerate(notes):
+            if note[0] == onset and note[2] == dur:
+                out.append(idx)
+        return out
