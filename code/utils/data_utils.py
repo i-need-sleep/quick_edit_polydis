@@ -1,3 +1,4 @@
+import pretty_midi
 import torch
 
 def prep_batch(batch, device):
@@ -51,4 +52,16 @@ def prettymidi_notes_to_onset_pitch_duration(notes, step_size = 0.25):
     out = []
     for note in notes:
         out.append([int(note.start / step_size), note.pitch, int((note.end - note.start) / step_size)])
+    return out
+
+def onset_pitch_duration_prettymidi_notes(nmat, step_size = 0.25):
+    out = []
+    for n in nmat:
+        note = pretty_midi.Note(
+            start = n[0] * step_size,
+            end = (n[0] + n[2]) * step_size,
+            pitch = n[1],
+            velocity = 100
+            )
+        out.append(note)
     return out
