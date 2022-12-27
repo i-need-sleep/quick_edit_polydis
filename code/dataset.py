@@ -121,8 +121,6 @@ class Collate(object):
             _, notes = self.polydis.decoder.grid_to_pr_and_notes(ptree[line_idx].numpy().astype(int))
 
             # Apply rule-based approximations to the input notes
-            print(notes)
-            exit()
             notes_rule = self.rule(notes, chords[line_idx])
 
             # Derive edits 

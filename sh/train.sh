@@ -21,5 +21,5 @@ echo "START"               # 输出起始信息
 source /apps/local/anaconda3/bin/activate gus          # 调用 virtual env
 python -u train.py \
     --name train_base \
-    --lr 5e-4
+    --lr 1e-3
 echo "FINISH"                       # 输出起始信息
