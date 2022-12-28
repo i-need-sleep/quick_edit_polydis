@@ -151,7 +151,7 @@ class EditMuseBERT(torch.nn.Module):
         raise
         return
 
-    def inference(self, chd ,editor_in):
+    def inference(self, chd ,editor_in, return_context_inserts=False):
         z_chd = self.encode_chd(chd)
         edits_out, n_inserts_out = self.encode(editor_in, z_chd, mask_by_line=True)
 
@@ -160,6 +160,7 @@ class EditMuseBERT(torch.nn.Module):
         slicess = self.decode(decoder_in, z_chd, decoder_output_mask, per_line=True)
         
         out = []
+        inserts = []
         for i, slices in enumerate(slicess):
         
             inserted_atr = self.slices_to_atr(slices)
@@ -172,6 +173,10 @@ class EditMuseBERT(torch.nn.Module):
                 inserted_notes = decode_atr_mat_to_nmat(np.array(inserted_atr)).tolist()
         
             out.append(context_notes[i] + inserted_notes)
+            inserts.append(inserted_notes)
+        
+        if return_context_inserts:
+            return context_notes, inserts, out
         return out
     
     def slices_to_atr(self, slices):
