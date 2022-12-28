@@ -13,7 +13,7 @@ import utils.rules
 def train(args):
 
     if args.debug:
-        args.checkpoint = '../results/checkpoints/debug/batchsize32_lr1e-05_0_4999_100.bin'
+        # args.checkpoint = '../results/checkpoints/debug/batchsize32_lr1e-05_0_4999_100.bin'
         args.batch_size = 2
         args.batch_size_dev = 2
     print(args)
@@ -24,7 +24,7 @@ def train(args):
     print(device)
 
     # Make loaders
-    wrapper = LoaderWrapper(args.batch_size, args.batch_size_dev)
+    wrapper = LoaderWrapper(args.batch_size, args.batch_size_dev, edit_scheme=args.edit_scheme)
     train_loader = wrapper.get_loader(split='train')
     dev_loader = wrapper.get_loader(split='dev')
     print(f'Training laoder size: {len(train_loader)}')
@@ -40,14 +40,9 @@ def train(args):
     writer = SummaryWriter(log_dir=f'../results/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=f'{args.name}, batch_size={args.batch_size}, Adam_lr_enc={args.lr}, {date_str}')
 
     # Setup training
-    if args.debug:
-        model = EditMuseBERT(device, wrapper,n_edit_types=wrapper.collate.editor.pitch_range, n_decoder_layers=2).to(device)
-    else:
-        model = EditMuseBERT(device, wrapper,n_edit_types=wrapper.collate.editor.pitch_range).to(device)
+    model = EditMuseBERT(device, wrapper).to(device)
     
     # CE losses. Use a weigheed loss for edits
-    edit_weights = torch.tensor([0.1] + [1 for _ in range(127)])
-    criterion_edits = torch.nn.CrossEntropyLoss(weight=edit_weights)
     criterion = torch.nn.CrossEntropyLoss()
 
     # Optimizer
@@ -69,12 +64,7 @@ def train(args):
 
     for epoch in range(args.n_epoch):
         # Curriculum. Change me
-        if epoch < 20:
-            wrapper.train_loader.dataset.chord_sampling_method = '909_prog'
-        elif epoch < 30:
-            wrapper.train_loader.dataset.chord_sampling_method = '909_chord'
-        else:
-            wrapper.train_loader.dataset.chord_sampling_method = 'any'
+        wrapper.train_loader.dataset.chord_sampling_method = '909_prog'
 
         for batch_idx, batch in enumerate(train_loader):
 
@@ -140,7 +130,7 @@ def train(args):
                     'optimiser_state_dict': optimiser.state_dict(),
                     }, save_path)
 
-            if n_iter % 5000 == 0 or args.debug:
+            if n_iter % 5000 == 0:
 
                 try:
                     prec, recall, f1 = eval(model, dev_loader, device)
@@ -174,7 +164,7 @@ def eval(model, loader, device):
                 n_pred += len(notes_pred[i])
                 n_ref += len(notes_ref[i])
                 n_hit = eval_notes_hits(notes_pred[i], notes_ref[i])    
-                
+
         # Eval for f1
         if n_pred == 0:
             n_pred = 1
@@ -217,6 +207,9 @@ if __name__ == '__main__':
 
     # Rules
     parser.add_argument('--identity_rule', action='store_true')
+
+    # Edit operation sets
+    parser.add_argument('--edit_scheme', default='mfmc', type=str) 
 
     # Debug
     parser.add_argument('--debug', action='store_true')

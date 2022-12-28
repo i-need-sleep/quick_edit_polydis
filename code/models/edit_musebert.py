@@ -9,13 +9,15 @@ from models.musebert.musebert_model import MuseBERT
 from models.musebert.note_attribute_repr import decode_atr_mat_to_nmat
 
 class EditMuseBERT(torch.nn.Module):
-    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', n_edit_types=128, max_n_inserts=16, n_decoder_layers=3):
+    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', n_edit_types=128, max_n_inserts=16, n_decoder_layers=2):
         super(EditMuseBERT, self).__init__()
         
         self.wrapper = wrapper
         self.device = device
         self.pad_len = self.wrapper.collate.converter.pad_length
         self.max_n_inserts = max_n_inserts
+
+        n_edit_types = wrapper.collate.editor.pitch_range
         
         # Load a pretrained MuseBERT encoder
         self.encoder = MuseBERT.init_model(loss_inds=(0, 1, 2, 3, 4, 5, 6), relation_vocab_sizes=(5, 5, 5, 5)).to(device)
@@ -198,29 +200,10 @@ class EditMuseBERT(torch.nn.Module):
         for line_idx in range(len(edits_out)):
 
             # Build the transformed notes
-            notes_context_line = []
             nmat_line = decode_atr_mat_to_nmat(atr[line_idx][: length[line_idx]]).tolist()
             edits_line = edits_out[line_idx]
 
-            # Since we predict pitch changes with soft labels, we have to do a softmax over all note groups with the same onset/dur
-            # Do this note-by-note.
-            processed_inds = []
-            for idx in range(len(nmat_line)):
-                if idx not in processed_inds:
-                    inds = self._find_indices(nmat_line, idx)
-                    processed_inds += inds
-                    cur_logits = edits_line[inds]
-                    cur_probs = torch.nn.Softmax(dim=0)(cur_logits)
-                    for i, ind in enumerate(inds):
-                        # Find the highest prob
-                        highest_idx = torch.max(cur_probs, dim=1).indices[i].item()
-
-                        # Add the new pitch-changed note
-                        if highest_idx > 0:
-                            notes_context_line.append([nmat_line[ind][0], highest_idx, nmat_line[ind][2]])
-
-                        # Adjust the probs
-                        cur_probs[:, highest_idx] -= 1 / len(inds)
+            notes_context_line = self.wrapper.collate.editor.edits_to_nmat(nmat_line, edits_line)
 
             # Build fake new notes for prediction
             notes_ref = []
@@ -245,13 +228,3 @@ class EditMuseBERT(torch.nn.Module):
         output_mask_dec = torch.stack(output_mask_dec, dim=0).squeeze(1)
         
         return [torch.tensor(cpt_atr_dec).to(self.device), torch.tensor(cpt_rel_dec).to(self.device), length_dec], output_mask_dec, notes_context
-
-    def _find_indices(self, notes, i):
-        # Given a nmat, find the indices of all notes with the same onset/duration as notes[i] (including i)
-        onset = notes[i][0]
-        dur = notes[i][2]
-        out = []
-        for idx, note in enumerate(notes):
-            if note[0] == onset and note[2] == dur:
-                out.append(idx)
-        return out

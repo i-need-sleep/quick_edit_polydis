@@ -204,8 +204,15 @@ class Collate(object):
         }
 
 class LoaderWrapper(object):
-    def __init__(self, batch_size, batch_size_dev, shuffle=True):
-        self.editor = utils.edits.DefaultEditSet()
+
+    def __init__(self, batch_size, batch_size_dev, edit_scheme='mfmc', shuffle=True):
+        if edit_scheme == 'default':
+            self.editor = utils.edits.DefaultEditSet()
+        elif edit_scheme == 'mfmc':
+            self.editor = utils.edits.MFMCEditSet()
+        else:
+            raise
+        
         self.collate = Collate(self.editor)
         self.train_set = EditDatast('train')
         self.dev_set = EditDatast('dev')
@@ -326,12 +333,8 @@ class Note2MuseBERTConverter():
 
 if __name__ == '__main__':
     import tqdm
-    wrapper = LoaderWrapper(3, 3)
+    wrapper = LoaderWrapper(3, 3, edit_scheme='mfmc')
     loader = wrapper.get_loader('train')
-    # for batch in tqdm.tqdm(loader):
-    #     continue
-    notes = [[1, 2, 3]]
-    print(notes)
-    out = wrapper.collate.converter.convert(notes)
-    print(out)
+    for batch in tqdm.tqdm(loader):
+        break
     print('done')
