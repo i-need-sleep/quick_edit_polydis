@@ -280,6 +280,11 @@ class MFMCEditSet():
             (-1, i, {'capacity': 1, 'weight': 0}) for i in range(len(notes_out))
         ])
 
+        # Edge case: empty notes_in
+        g.add_edges_from([
+            (-1, -2, {'capacity': 1, 'weight': 0})
+        ])
+
         # Edges from notes_ref to the target node
         g.add_edges_from([
             (i, -2, {'capacity': 1, 'weight': 0}) for i in range(len(notes_out), len(notes_out) + len(notes_ref))
