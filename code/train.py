@@ -122,12 +122,10 @@ def train(args):
                 n_prev_iter = n_iter
                 running_loss = 0
 
-            if n_iter % 5000 == 0 or args.debug:
+            if n_iter % 1000 == 0 or args.debug:
                 if args.debug:
                     prec, recall, f1 = eval(model, dev_loader, device)
 
-                if f1 > best_f1:
-                    best_f1 = f1
                 try:
                     os.makedirs(f'../results/checkpoints/{args.name}')
                 except:
@@ -142,6 +140,8 @@ def train(args):
                     'optimiser_state_dict': optimiser.state_dict(),
                     }, save_path)
 
+            if n_iter % 5000 == 0 or args.debug:
+
                 try:
                     prec, recall, f1 = eval(model, dev_loader, device)
                     writer.add_scalar('dev/prec', prec, n_iter)
@@ -151,6 +151,9 @@ def train(args):
                 except:
                     print('eval died!!')
                     f1 = best_f1 + 1e-10
+                
+                if f1 > best_f1:
+                    best_f1 = f1
                     
     print('DONE !!!')
 
