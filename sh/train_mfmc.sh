@@ -21,6 +21,6 @@ echo "START"               # 输出起始信息
 source /apps/local/anaconda3/bin/activate gus          # 调用 virtual env
 python -u train.py \
     --name train_mfmc \
-    --lr 1e-3 \
+    --lr 5e-3 \
     --edit_scheme mfmc
 echo "FINISH"                       # 输出起始信息
