@@ -54,6 +54,7 @@ def train(args):
         loaded = torch.load(args.checkpoint, map_location=device)
         model.load_state_dict(loaded['model_state_dict'])
         optimiser.load_state_dict(loaded['optimiser_state_dict'])
+        optimiser.param_groups[0]['capturable'] = True
 
     # train
     n_iter = 0
@@ -130,7 +131,7 @@ def train(args):
                     'optimiser_state_dict': optimiser.state_dict(),
                     }, save_path)
 
-            if n_iter % 5000 == 0:
+            if n_iter % 5000 == 0 or args.eval:
 
                 try:
                     prec, recall, f1 = eval(model, dev_loader, device)
@@ -138,9 +139,11 @@ def train(args):
                     writer.add_scalar('dev/recall', recall, n_iter)
                     writer.add_scalar('dev/f1', f1, n_iter)
                     print(f'F1: {f1}')
+                    return
                 except:
                     print('eval died!!')
                     f1 = best_f1 + 1e-10
+                    return
                 
                 if f1 > best_f1:
                     best_f1 = f1
@@ -158,8 +161,11 @@ def eval(model, loader, device):
             
             # notes_ref: [[note sequence: [start, pitch, dur], ...], ...]
             chd, editor_in, notes_ref = prep_batch_inference(batch, device)
-            notes_pred = model.inference(chd, editor_in)
-
+            if not args.eval_rules:
+                notes_pred = model.inference(chd, editor_in)
+            else:
+                notes_pred, _, _ = model.inference(chd, editor_in, return_context_inserts=True)
+                
             for i in range(len(notes_ref)):
                 n_pred += len(notes_pred[i])
                 n_ref += len(notes_ref[i])
@@ -204,6 +210,10 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=1e-3, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str) 
+
+    # Eval
+    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--eval_rules', action='store_true')
 
     # Rules
     parser.add_argument('--identity_rule', action='store_true')
