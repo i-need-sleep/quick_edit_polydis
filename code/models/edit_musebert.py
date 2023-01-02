@@ -9,7 +9,7 @@ from models.musebert.musebert_model import MuseBERT
 from models.musebert.note_attribute_repr import decode_atr_mat_to_nmat
 
 class EditMuseBERT(torch.nn.Module):
-    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', n_edit_types=128, max_n_inserts=16, n_decoder_layers=2):
+    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', max_n_inserts=16, n_decoder_layers=2, include_original_notes=False):
         super(EditMuseBERT, self).__init__()
         
         self.wrapper = wrapper
@@ -24,6 +24,12 @@ class EditMuseBERT(torch.nn.Module):
         self.encoder.load_model(pretrained_path, device)
         print(f'MuseBERT encoder loaded from: {pretrained_path}')
 
+        # Initialize a new atr embedding head if we include atrs for original notes
+        self.include_original_notes = include_original_notes
+        if include_original_notes:
+            self.original_embeddings = torch.nn.ModuleList([torch.nn.Embedding(15, 128) for _ in range(7)])
+            self.emb_agg = torch.nn.Linear(256, 128)
+
         self.step_embs = torch.nn.Embedding(32, 128)
         self.edit_head = torch.nn.Linear(128, n_edit_types)
         self.n_inserts_head = torch.nn.Linear(128, max_n_inserts) # num of inserts at each onset step
@@ -35,13 +41,20 @@ class EditMuseBERT(torch.nn.Module):
         self.decoder = MuseBERT.init_model(loss_inds=(0, 1, 2, 3, 4, 5, 6), relation_vocab_sizes=(5, 5, 5, 5), N=n_decoder_layers).to(device)
         self.decoder_splits = [9, 7, 7, 3, 12, 5, 8] # Sizes for each dim of the factorised features
     
+    def _original_onset_pitch_dur_embedding(self, data_in):
+        return sum([self.original_embeddings[i](data_in[:, :, i])
+                    for i in range(7)])
+
     def encode_chd(self, chd):
         x = self.chord_enc(chd)
         z_chd = get_zs_from_dists([x], False)[0]
         return z_chd
 
     def encode(self, editor_in, z_chd, mask_by_line=False):
-        [data_in, rel_mat_in, length] = editor_in
+        if self.include_original_notes:
+            [data_in, rel_mat_in, length, data_in_original] = editor_in
+        else:
+            [data_in, rel_mat_in, length] = editor_in
 
         # Embed the time step tokens (for predicting n_inserts)
         onset_steps = torch.tensor([[i for i in range(32)] for j in range(data_in.shape[0])])
@@ -49,6 +62,12 @@ class EditMuseBERT(torch.nn.Module):
 
         # Embed the note atrs
         x = self.encoder.onset_pitch_dur_embedding(data_in)
+
+        # Aggregate the note atrs before/after the rule-based transformation
+        if self.include_original_notes:
+            x_original = self._original_onset_pitch_dur_embedding(data_in_original)
+            x = torch.cat((x, x_original), dim=2)
+            x = self.emb_agg(x)
 
         # Update the input embs: left to right: [z_chd, onset_embs, x]
         z_chd = z_chd.unsqueeze(1)

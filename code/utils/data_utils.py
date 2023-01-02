@@ -1,7 +1,7 @@
 import pretty_midi
 import torch
 
-def prep_batch(batch, device):
+def prep_batch(batch, device, include_original_notes=False):
 
     chd = batch['chords'].to(device)
 
@@ -22,10 +22,14 @@ def prep_batch(batch, device):
     decoder_output_mask = batch['output_mask_dec'].to(device)
     
     decoder_atr_out = decoder_atr_out[decoder_output_mask > 0]
+
+    if include_original_notes:
+        atr_original = torch.tensor(batch['atr_original']).to(device)
+        return chd, [atr, cpt_rel, length, atr_original], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
     
     return chd, [atr, cpt_rel, length], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
 
-def prep_batch_inference(batch, device, ref=True):
+def prep_batch_inference(batch, device, ref=True, include_original_notes=False):
 
     chd = batch['chords'].to(device)
 
@@ -37,7 +41,11 @@ def prep_batch_inference(batch, device, ref=True):
     notes_ref = []
     if ref:
         notes_ref = batch['notes_ref']
-    
+
+    if include_original_notes:
+        atr_original = torch.tensor(batch['atr_original']).to(device)
+        return chd, [atr, cpt_rel, length, atr_original], notes_ref
+
     return chd, [atr, cpt_rel, length], notes_ref
 
 def lay_flat(lst):

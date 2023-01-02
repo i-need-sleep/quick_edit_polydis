@@ -27,8 +27,8 @@ def train(args):
     wrapper = LoaderWrapper(args.batch_size, args.batch_size_dev, edit_scheme=args.edit_scheme)
     train_loader = wrapper.get_loader(split='train')
     dev_loader = wrapper.get_loader(split='dev')
-    print(f'Training laoder size: {len(train_loader)}')
-    print(f'Dev laoder size: {len(dev_loader)}')
+    print(f'Training laoder #batches: {len(train_loader)}')
+    print(f'Dev laoder #batches: {len(dev_loader)}')
     print(f'Dev #songs: {- dev_loader.dataset.split_idx}')
 
     # Set the rule set
@@ -40,7 +40,7 @@ def train(args):
     writer = SummaryWriter(log_dir=f'../results/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=f'{args.name}, batch_size={args.batch_size}, Adam_lr_enc={args.lr}, {date_str}')
 
     # Setup training
-    model = EditMuseBERT(device, wrapper).to(device)
+    model = EditMuseBERT(device, wrapper, include_original_notes=args.include_original_notes).to(device)
     
     # CE losses. Use a weigheed loss for edits
     criterion = torch.nn.CrossEntropyLoss()
@@ -72,7 +72,7 @@ def train(args):
             model.train()
             optimiser.zero_grad()
 
-            chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device)
+            chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes)
 
             # Encoder forward pass
             z_chd = model.encode_chd(chd)
@@ -160,7 +160,7 @@ def eval(model, loader, device):
         for idx, batch in enumerate(loader):
             
             # notes_ref: [[note sequence: [start, pitch, dur], ...], ...]
-            chd, editor_in, notes_ref = prep_batch_inference(batch, device)
+            chd, editor_in, notes_ref = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes)
             if not args.eval_rules:
                 notes_pred = model.inference(chd, editor_in)
             else:
@@ -220,6 +220,9 @@ if __name__ == '__main__':
 
     # Edit operation sets
     parser.add_argument('--edit_scheme', default='mfmc', type=str) 
+
+    # Model input
+    parser.add_argument('--include_original_notes', action='store_true')
 
     # Debug
     parser.add_argument('--debug', action='store_true')
