@@ -169,7 +169,7 @@ def eval(model, loader, device):
             for i in range(len(notes_ref)):
                 n_pred += len(notes_pred[i])
                 n_ref += len(notes_ref[i])
-                n_hit = eval_notes_hits(notes_pred[i], notes_ref[i])    
+                n_hit += eval_notes_hits(notes_pred[i], notes_ref[i])    
 
         # Eval for f1
         if n_pred == 0:
