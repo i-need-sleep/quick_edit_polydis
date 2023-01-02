@@ -23,5 +23,6 @@ python -u train.py \
     --name train_mfmc_identityRule \
     --lr 1e-3 \
     --edit_scheme mfmc \
-    --identity_rule
+    --identity_rule \
+    --batch_size 32
 echo "FINISH"                       # 输出起始信息
