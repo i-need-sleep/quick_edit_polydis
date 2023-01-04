@@ -68,7 +68,6 @@ def train(args):
         wrapper.train_loader.dataset.chord_sampling_method = '909_prog'
 
         for batch_idx, batch in enumerate(train_loader):
-            print(n_iter)
 
             model.train()
             optimiser.zero_grad()
