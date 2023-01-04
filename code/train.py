@@ -68,11 +68,12 @@ def train(args):
         wrapper.train_loader.dataset.chord_sampling_method = '909_prog'
 
         for batch_idx, batch in enumerate(train_loader):
+            print(n_iter)
 
             model.train()
             optimiser.zero_grad()
 
-            chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes)
+            chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules)
 
             # Encoder forward pass
             z_chd = model.encode_chd(chd)
@@ -160,7 +161,7 @@ def eval(model, loader, device):
         for idx, batch in enumerate(loader):
             
             # notes_ref: [[note sequence: [start, pitch, dur], ...], ...]
-            chd, editor_in, notes_ref = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes)
+            chd, editor_in, notes_ref = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules)
             if not args.eval_rules:
                 notes_pred = model.inference(chd, editor_in)
             else:
@@ -223,6 +224,7 @@ if __name__ == '__main__':
 
     # Model input
     parser.add_argument('--include_original_notes', action='store_true')
+    parser.add_argument('--swap_original_rules', action='store_true')
 
     # Debug
     parser.add_argument('--debug', action='store_true')

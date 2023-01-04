@@ -1,7 +1,7 @@
 import pretty_midi
 import torch
 
-def prep_batch(batch, device, include_original_notes=False):
+def prep_batch(batch, device, include_original_notes=False, swap_original_rules=False):
 
     chd = batch['chords'].to(device)
 
@@ -25,11 +25,16 @@ def prep_batch(batch, device, include_original_notes=False):
 
     if include_original_notes:
         atr_original = torch.tensor(batch['atr_original']).to(device)
-        return chd, [atr, cpt_rel, length, atr_original], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
+
+        if not swap_original_rules:
+            return chd, [atr, cpt_rel, length, atr_original], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
+        else:
+            rel_original = torch.tensor(batch['rel_original']).to(device)
+            return chd, [atr_original, rel_original, length, atr], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
     
     return chd, [atr, cpt_rel, length], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
 
-def prep_batch_inference(batch, device, ref=True, include_original_notes=False):
+def prep_batch_inference(batch, device, ref=True, include_original_notes=False, swap_original_rules=False):
 
     chd = batch['chords'].to(device)
 
@@ -44,7 +49,13 @@ def prep_batch_inference(batch, device, ref=True, include_original_notes=False):
 
     if include_original_notes:
         atr_original = torch.tensor(batch['atr_original']).to(device)
-        return chd, [atr, cpt_rel, length, atr_original], notes_ref
+
+        if not swap_original_rules: 
+            return chd, [atr, cpt_rel, length, atr_original], notes_ref
+        else:
+            rel_original = torch.tensor(batch['rel_original']).to(device)
+            return chd, [atr_original, rel_original, length, atr], notes_ref
+
 
     return chd, [atr, cpt_rel, length], notes_ref
 

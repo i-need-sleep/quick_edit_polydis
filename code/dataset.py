@@ -112,7 +112,7 @@ class Collate(object):
         notes_out, pitch_changes, n_inserts, inserts = [], [], [], []
         atr, cpt_atr, cpt_rel, mask, inds, length = [], [], [], [], [], []
         atr_dec, cpt_atr_dec, cpt_rel_dec, length_dec, output_mask_dec = [], [], [], [], []
-        atr_original = []
+        atr_original, rel_original = [], []
         notes_ref = []
         
         for line_idx in range(pr_mat.shape[0]):
@@ -157,8 +157,10 @@ class Collate(object):
             # Also convert the original notes
             notes_original = utils.data_utils.prettymidi_notes_to_onset_pitch_duration(notes)
             notes_original = notes_original[: self.converter.pad_length - 2]
-            atr_original_l, _, _, _, _, _ = self.converter.convert(notes_original)
+            atr_original_l, _, rel_original_l, _, _, _ = self.converter.convert(notes_original)
+
             atr_original.append(atr_original_l)
+            rel_original.append(rel_original_l)
 
             # Also for the decoder
             atr_dec_l, cpt_atr_dec_l, cpt_rel_dec_l, length_dec_l, output_mask_dec_l = self.converter.convert_for_decoder(decoder_notes_in_line, decoder_notes_out_line)
@@ -188,6 +190,7 @@ class Collate(object):
         output_mask_dec = torch.stack(output_mask_dec, dim=0).squeeze(1)
 
         atr_original = np.array(atr_original)
+        rel_original = np.array(rel_original)
             
         return {
             'chords': chords,
@@ -212,7 +215,8 @@ class Collate(object):
 
             'notes_ref': notes_ref,
 
-            'atr_original': atr_original
+            'atr_original': atr_original,
+            'rel_original': rel_original,
         }
 
 class LoaderWrapper(object):
