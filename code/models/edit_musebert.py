@@ -22,7 +22,7 @@ class EditMuseBERT(torch.nn.Module):
         # Load a pretrained MuseBERT encoder
         self.encoder = MuseBERT.init_model(loss_inds=(0, 1, 2, 3, 4, 5, 6), relation_vocab_sizes=(5, 5, 5, 5)).to(device)
 
-        if from_scratch:
+        if not from_scratch:
             self.encoder.load_model(pretrained_path, device)
             print(f'MuseBERT encoder loaded from: {pretrained_path}')
 
