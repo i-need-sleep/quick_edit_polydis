@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=train_mfmc_identityRule       # 任务名
+#SBATCH --job-name=train_mfmc_identityRule_cont       # 任务名
 #SBATCH --nodes=1                   # 这里不用动 多节点脚本请查官方文档
 #SBATCH --ntasks=1                  # 这里不用动 多任务脚本请查官方文档
 #SBATCH --cpus-per-task=4           # 要几块CPU (一般4块就够用了)
@@ -20,9 +20,10 @@ cd /l/users/yichen.huang/quick_edit_polydis/code   # 切到程序目录
 echo "START"               # 输出起始信息
 source /apps/local/anaconda3/bin/activate gus          # 调用 virtual env
 python -u train.py \
-    --name train_mfmc_identityRule \
+    --name train_mfmc_identityRule_cont \
     --lr 1e-3 \
     --edit_scheme mfmc \
     --identity_rule \
-    --batch_size 32
+    --batch_size 32 \
+    --checkpoint ../results/checkpoints/train_mfmc_identityRule/batchsize32_lr0.001_0_4999_0.bin
 echo "FINISH"                       # 输出起始信息
