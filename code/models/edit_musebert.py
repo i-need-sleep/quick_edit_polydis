@@ -9,7 +9,7 @@ from models.musebert.musebert_model import MuseBERT
 from models.musebert.note_attribute_repr import decode_atr_mat_to_nmat
 
 class EditMuseBERT(torch.nn.Module):
-    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', max_n_inserts=16, n_decoder_layers=2, include_original_notes=False):
+    def __init__(self, device, wrapper, pretrained_path='../pretrained/musebert.pt', max_n_inserts=16, n_decoder_layers=2, include_original_notes=False, from_scratch=False):
         super(EditMuseBERT, self).__init__()
         
         self.wrapper = wrapper
@@ -21,8 +21,10 @@ class EditMuseBERT(torch.nn.Module):
         
         # Load a pretrained MuseBERT encoder
         self.encoder = MuseBERT.init_model(loss_inds=(0, 1, 2, 3, 4, 5, 6), relation_vocab_sizes=(5, 5, 5, 5)).to(device)
-        self.encoder.load_model(pretrained_path, device)
-        print(f'MuseBERT encoder loaded from: {pretrained_path}')
+
+        if from_scratch:
+            self.encoder.load_model(pretrained_path, device)
+            print(f'MuseBERT encoder loaded from: {pretrained_path}')
 
         # Initialize a new atr embedding head if we include atrs for original notes
         self.include_original_notes = include_original_notes

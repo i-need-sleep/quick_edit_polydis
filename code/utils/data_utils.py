@@ -1,7 +1,7 @@
 import pretty_midi
 import torch
 
-def prep_batch(batch, device, include_original_notes=False, swap_original_rules=False):
+def prep_batch(batch, device, include_original_notes=False, swap_original_rules=False, altered_atr_original_rel=False):
 
     chd = batch['chords'].to(device)
 
@@ -23,13 +23,17 @@ def prep_batch(batch, device, include_original_notes=False, swap_original_rules=
     
     decoder_atr_out = decoder_atr_out[decoder_output_mask > 0]
 
+    atr_original = torch.tensor(batch['atr_original']).to(device)
+    rel_original = torch.tensor(batch['rel_original']).to(device)
+
+    if altered_atr_original_rel:
+        chd, [atr, rel_original, length], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
+
     if include_original_notes:
-        atr_original = torch.tensor(batch['atr_original']).to(device)
 
         if not swap_original_rules:
             return chd, [atr, cpt_rel, length, atr_original], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
         else:
-            rel_original = torch.tensor(batch['rel_original']).to(device)
             return chd, [atr_original, rel_original, length, atr], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
     
     return chd, [atr, cpt_rel, length], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask

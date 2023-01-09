@@ -40,7 +40,7 @@ def train(args):
     writer = SummaryWriter(log_dir=f'../results/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=f'{args.name}, batch_size={args.batch_size}, Adam_lr_enc={args.lr}, {date_str}')
 
     # Setup training
-    model = EditMuseBERT(device, wrapper, include_original_notes=args.include_original_notes).to(device)
+    model = EditMuseBERT(device, wrapper, include_original_notes=args.include_original_notes, from_scratch=args.from_scratch).to(device)
     
     # CE losses. Use a weigheed loss for edits
     criterion = torch.nn.CrossEntropyLoss()
@@ -72,7 +72,7 @@ def train(args):
             model.train()
             optimiser.zero_grad()
 
-            chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules)
+            chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel)
 
             # Encoder forward pass
             z_chd = model.encode_chd(chd)
@@ -115,7 +115,7 @@ def train(args):
 
             if n_iter % 1000 == 0 or args.debug:
                 if args.debug:
-                    prec, recall, f1 = eval(model, dev_loader, device)
+                    prec, recall, f1 = eval(model, dev_loader, device, args)
 
                 try:
                     os.makedirs(f'../results/checkpoints/{args.name}')
@@ -134,23 +134,21 @@ def train(args):
             if n_iter % 5000 == 0 or args.eval:
 
                 try:
-                    prec, recall, f1 = eval(model, dev_loader, device)
+                    prec, recall, f1 = eval(model, dev_loader, device, args)
                     writer.add_scalar('dev/prec', prec, n_iter)
                     writer.add_scalar('dev/recall', recall, n_iter)
                     writer.add_scalar('dev/f1', f1, n_iter)
                     print(f'F1: {f1}')
-                    return
                 except:
                     print('eval died!!')
                     f1 = best_f1 + 1e-10
-                    return
                 
                 if f1 > best_f1:
                     best_f1 = f1
                     
     print('DONE !!!')
 
-def eval(model, loader, device):
+def eval(model, loader, device, args):
     loader.dataset.chord_sampling_method = '909_prog'
     
     model.eval()
@@ -160,7 +158,7 @@ def eval(model, loader, device):
         for idx, batch in enumerate(loader):
             
             # notes_ref: [[note sequence: [start, pitch, dur], ...], ...]
-            chd, editor_in, notes_ref = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules)
+            chd, editor_in, notes_ref = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel)
             if not args.eval_rules:
                 notes_pred = model.inference(chd, editor_in)
             else:
@@ -224,6 +222,8 @@ if __name__ == '__main__':
     # Model input
     parser.add_argument('--include_original_notes', action='store_true')
     parser.add_argument('--swap_original_rules', action='store_true')
+    parser.add_argument('--from_scratch', action='store_true')
+    parser.add_argument('--altered_atr_original_rel', action='store_true')
 
     # Debug
     parser.add_argument('--debug', action='store_true')

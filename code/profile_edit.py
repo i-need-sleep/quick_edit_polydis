@@ -16,7 +16,7 @@ import utils.rules
 from torch.profiler import profile, record_function, ProfilerActivity
 from models.musebert.note_attribute_repr import decode_atr_mat_to_nmat
 
-def profile_edit():
+def profile_edit(args):
     n_iter = 3
 
     # Device
@@ -166,4 +166,29 @@ def profile_edit():
     prof.export_chrome_trace(f"../results/traces/trace_{device}_{n_iter}iter.json")
 
 if __name__ == '__main__':
-    profile_edit()
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--n_iter', default=3, type=int)
+    parser.add_argument('--checkpoint', default='', type=str) 
+
+    # Eval
+    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--eval_rules', action='store_true')
+
+    # Rules
+    parser.add_argument('--identity_rule', action='store_true')
+
+    # Edit operation sets
+    parser.add_argument('--edit_scheme', default='mfmc', type=str) 
+
+    # Model input
+    parser.add_argument('--include_original_notes', action='store_true')
+    parser.add_argument('--swap_original_rules', action='store_true')
+
+    # Debug
+    parser.add_argument('--debug', action='store_true')
+
+    args = parser.parse_args()
+
+    profile_edit(args)
