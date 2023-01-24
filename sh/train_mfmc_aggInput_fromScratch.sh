@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=train_mfmc_aggInput_fromScratch_cont4_       # 任务名
+#SBATCH --job-name=train_mfmc_aggInput_fromScratch_cont5_       # 任务名
 #SBATCH --nodes=1                   # 这里不用动 多节点脚本请查官方文档
 #SBATCH --ntasks=1                  # 这里不用动 多任务脚本请查官方文档
 #SBATCH --cpus-per-task=4           # 要几块CPU (一般4块就够用了)
@@ -20,10 +20,10 @@ cd /l/users/yichen.huang/quick_edit_polydis/code   # 切到程序目录
 echo "START"               # 输出起始信息
 source /apps/local/anaconda3/bin/activate gus          # 调用 virtual env
 python -u train.py \
-    --name train_mfmc_aggInput_fromScratch_cont4_ \
+    --name train_mfmc_aggInput_fromScratch_cont5_ \
     --lr 1e-3 \
     --edit_scheme mfmc \
     --include_original_notes \
     --from_scratch \
-    --checkpoint ../results/checkpoints/train_mfmc_aggInput_fromScratch_cont3_/batchsize48_lr0.001_0_3999_0.bin
+    --checkpoint ../results/checkpoints/train_mfmc_aggInput_fromScratch_cont4_/batchsize48_lr0.001_0_3999_0.bin
 echo "FINISH"                       # 输出起始信息
