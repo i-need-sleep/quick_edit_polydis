@@ -22,5 +22,6 @@ source /apps/local/anaconda3/bin/activate gus          # 调用 virtual env
 python -u train.py \
     --name train_base \
     --lr 1e-3 \
-    --edit_scheme default
+    --edit_scheme mfmc \
+    --altered_atr_original_rel
 echo "FINISH"                       # 输出起始信息

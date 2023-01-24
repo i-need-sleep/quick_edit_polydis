@@ -17,7 +17,6 @@ from torch.profiler import profile, record_function, ProfilerActivity
 from models.musebert.note_attribute_repr import decode_atr_mat_to_nmat
 
 def profile_edit(args):
-    n_iter = 3
 
     # Device
     torch.manual_seed(21)
@@ -25,7 +24,7 @@ def profile_edit(args):
     print(device)
 
     # Make loaders
-    wrapper = LoaderWrapper(1, 1)
+    wrapper = LoaderWrapper(1, 1, edit_scheme=args.edit_scheme)
     train_loader = wrapper.get_loader(split='train')
     dev_loader = wrapper.get_loader(split='dev')
     print(f'Training laoder size: {len(train_loader)}')
@@ -33,18 +32,15 @@ def profile_edit(args):
     print(f'Dev #songs: {- dev_loader.dataset.split_idx}')
 
     # Set the rule set
-    # wrapper.collate.rule = utils.rules.identity
+    if args.identity_rule:
+        wrapper.collate.rule = utils.rules.identity
 
     # Setup training
-    if True:
-        model = EditMuseBERT(device, wrapper,n_edit_types=wrapper.collate.editor.pitch_range, n_decoder_layers=2).to(device)
-    else:
-        model = EditMuseBERT(device, wrapper,n_edit_types=wrapper.collate.editor.pitch_range).to(device)
+    model = EditMuseBERT(device, wrapper, include_original_notes=args.include_original_notes).to(device)
 
     # Load from checkpoints
-    checkpoint = '../results/checkpoints/debug/batchsize32_lr1e-05_0_4999_100.bin'
-    print(f'loading checkpoint: {checkpoint}')
-    loaded = torch.load(checkpoint, map_location=device)
+    print(f'loading checkpoint: {args.checkpoint}')
+    loaded = torch.load(args.checkpoint, map_location=device)
     model.load_state_dict(loaded['model_state_dict'])
 
     # Make a chord prog
@@ -87,6 +83,7 @@ def profile_edit(args):
         [8, 'd3', 0],
         [9, 'M3', 0],
         ])
+
     cmat = torch.tensor(cmat).to(device).float().unsqueeze(0)
 
     # Set up the profiler
@@ -95,7 +92,7 @@ def profile_edit(args):
         activities.append(ProfilerActivity.CUDA)
 
     with profile(activities=[ProfilerActivity.CPU], record_shapes=True) as prof:
-        for _ in range(n_iter):
+        for _ in range(args.n_iter):
             with record_function("loop"):
                 with record_function("Load data"):
                     # Get a texture from PoP909
@@ -125,6 +122,10 @@ def profile_edit(args):
                             # Convert notes for MuseBERT input
                             notes_out_line, _, _, _, _ = wrapper.collate.editor.get_edits(notes_rule, notes_polydis)
                             atr, _, cpt_rel, _, _, length = wrapper.collate.converter.convert(notes_out_line)
+                            if args.altered_atr_original_rel:
+                                notes_original__ = utils.data_utils.prettymidi_notes_to_onset_pitch_duration(notes_original)
+                                _, _, cpt_rel, _, _, _ = wrapper.collate.converter.convert(notes_original__)
+
 
                     with record_function("Edit Models"):
                         # Run the edit models
@@ -163,18 +164,14 @@ def profile_edit(args):
                                 out.append(context_notes[i] + inserted_notes)
     # Print/Save results
     print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-    prof.export_chrome_trace(f"../results/traces/trace_{device}_{n_iter}iter.json")
+    prof.export_chrome_trace(f"../results/traces/trace_{device}_{args.n_iter}iter.json")
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--n_iter', default=3, type=int)
-    parser.add_argument('--checkpoint', default='', type=str) 
-
-    # Eval
-    parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--eval_rules', action='store_true')
+    parser.add_argument('--checkpoint', default='../results/checkpoints/mfmc/mfmc_altered_atr_original_rel.bin', type=str) 
 
     # Rules
     parser.add_argument('--identity_rule', action='store_true')
@@ -185,6 +182,7 @@ if __name__ == '__main__':
     # Model input
     parser.add_argument('--include_original_notes', action='store_true')
     parser.add_argument('--swap_original_rules', action='store_true')
+    parser.add_argument('--altered_atr_original_rel', action='store_true')
 
     # Debug
     parser.add_argument('--debug', action='store_true')
