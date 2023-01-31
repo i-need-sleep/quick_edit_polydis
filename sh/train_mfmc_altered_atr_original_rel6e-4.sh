@@ -23,5 +23,6 @@ python -u train.py \
     --name train_mfmc_altered_atr_original_rel_6e-4_ \
     --lr 6e-4 \
     --edit_scheme mfmc \
-    --altered_atr_original_rel
+    --altered_atr_original_rel \
+    --batch_size 40
 echo "FINISH"                       # 输出起始信息
