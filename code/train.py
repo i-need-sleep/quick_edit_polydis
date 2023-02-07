@@ -53,8 +53,9 @@ def train(args):
         print(f'loading checkpoint: {args.checkpoint}')
         loaded = torch.load(args.checkpoint, map_location=device)
         model.load_state_dict(loaded['model_state_dict'])
-        optimiser.load_state_dict(loaded['optimiser_state_dict'])
-        optimiser.param_groups[0]['capturable'] = True
+        if not args.eval:
+            optimiser.load_state_dict(loaded['optimiser_state_dict'])
+            optimiser.param_groups[0]['capturable'] = True
 
     # train
     n_iter = 0
@@ -68,42 +69,45 @@ def train(args):
         wrapper.train_loader.dataset.chord_sampling_method = '909_prog'
 
         for batch_idx, batch in enumerate(train_loader):
-
-            model.train()
-            optimiser.zero_grad()
-
-            chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel)
-
-            # Encoder forward pass
-            z_chd = model.encode_chd(chd)
-            _, edits_out, n_inserts_out = model.encode(editor_in, z_chd)
-
-            # Encoder loss
-            edits_loss = criterion(edits_out, edits_ref)
-            n_inserts_loss = criterion(n_inserts_out, n_inserts_ref)
-
-            # Decoder forward pass
-            # Teacher forcing
-            # TODO: Student forcing, dynamic oracle?
-            decoder_out = model.decode(decoder_in, z_chd, decoder_out_mask) # [[ref_len, feat_dim],...]
-
-            # Decoder loss
-            decoder_loss = 0
-            for i in range(decoder_ref.shape[1]):
-                decoder_loss += criterion(decoder_out[i], decoder_ref[:, i]) / decoder_ref.shape[1]
-
-            # Backward pass
-            total_loss = edits_loss + n_inserts_loss + decoder_loss
             
-            total_loss.backward()
-            optimiser.step()
+            if not args.eval:
+
+                model.train()
+                optimiser.zero_grad()
+
+                chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel)
+
+                # Encoder forward pass
+                z_chd = model.encode_chd(chd)
+                _, edits_out, n_inserts_out = model.encode(editor_in, z_chd)
+
+                # Encoder loss
+                edits_loss = criterion(edits_out, edits_ref)
+                n_inserts_loss = criterion(n_inserts_out, n_inserts_ref)
+
+                # Decoder forward pass
+                # Teacher forcing
+                # TODO: Student forcing, dynamic oracle?
+                decoder_out = model.decode(decoder_in, z_chd, decoder_out_mask) # [[ref_len, feat_dim],...]
+
+                # Decoder loss
+                decoder_loss = 0
+                for i in range(decoder_ref.shape[1]):
+                    decoder_loss += criterion(decoder_out[i], decoder_ref[:, i]) / decoder_ref.shape[1]
+
+                # Backward pass
+                total_loss = edits_loss + n_inserts_loss + decoder_loss
                 
+                total_loss.backward()
+                optimiser.step()
+                    
+                writer.add_scalar('loss/edits_loss', edits_loss, n_iter)
+                writer.add_scalar('loss/n_inserts_loss', n_inserts_loss, n_iter)
+                writer.add_scalar('loss/decoder_loss', decoder_loss, n_iter)
+                writer.add_scalar('loss/total_loss', total_loss, n_iter)
+                running_loss += total_loss.detach()
+            
             n_iter += 1
-            writer.add_scalar('loss/edits_loss', edits_loss, n_iter)
-            writer.add_scalar('loss/n_inserts_loss', n_inserts_loss, n_iter)
-            writer.add_scalar('loss/decoder_loss', decoder_loss, n_iter)
-            writer.add_scalar('loss/total_loss', total_loss, n_iter)
-            running_loss += total_loss.detach()
 
             if n_iter % 100 == 0:
                 print(n_iter)
@@ -141,6 +145,7 @@ def train(args):
                     print(f'F1: {f1}')
                 except:
                     print('eval died!!')
+                    assert args.eval == False
                     f1 = best_f1 + 1e-10
                 
                 if f1 > best_f1:
