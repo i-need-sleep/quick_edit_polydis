@@ -110,7 +110,7 @@ def profile_edit(args):
                     with record_function("Prep data"):
                         with record_function("Recover original notes"):
                             # Original notes
-                            _, notes_original = wrapper.collate.polydis.decoder.grid_to_pr_and_notes(ptree.numpy().astype(int))
+                            _, notes_original = wrapper.collate.polydis.decoder.grid_to_pr_and_notes(ptree.cpu().numpy().astype(int))
                             notes_original_ = copy.deepcopy(notes_original)
 
                         with record_function("Apply rules"):
