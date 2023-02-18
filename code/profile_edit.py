@@ -24,7 +24,11 @@ def profile_edit(args):
     print(device)
 
     # Make loaders
-    wrapper = LoaderWrapper(1, 1, edit_scheme=args.edit_scheme)
+    if args.batched:
+        wrapper = LoaderWrapper(48, 32, edit_scheme=args.edit_scheme)
+    else:
+        wrapper = LoaderWrapper(1, 1, edit_scheme=args.edit_scheme)
+        
     train_loader = wrapper.get_loader(split='train')
     dev_loader = wrapper.get_loader(split='dev')
     print(f'Training laoder size: {len(train_loader)}')
@@ -186,6 +190,9 @@ if __name__ == '__main__':
 
     # Debug
     parser.add_argument('--debug', action='store_true')
+
+    # Profile
+    parser.add_argument('--batched', action='store_true')
 
     args = parser.parse_args()
 
