@@ -171,7 +171,7 @@ def eval(model, loader, device, args):
             f1 = 2/(1/prec + 1/recall)
         else:
             f1 = 0
-        print(f'#pred: {n_pred}, #true:{n_ref}, #hits:{n_hit}')
+        print(f'#pred: {n_preds}, #true:{n_refs}, #hits:{n_hits}')
         print(f'F1: {f1}, prec: {prec}, recall: {recall}')
         
         return prec, recall, f1
@@ -185,7 +185,6 @@ def eval_notes_hits(notes_pred, notes_ref):
             if note_ref[0] == start and note_ref[1] == pitch and note_ref[2] == dur:
                 n_hits += 1
                 notes_ref.pop(i)
-                break
     return n_hits
 
 def notes_break_down_to_steps(notes):
