@@ -61,7 +61,6 @@ def train(args):
     n_iter = 0
     n_prev_iter = 0
     running_loss = 0
-    best_f1 = 0
     print('Training...')
 
     for epoch in range(args.n_epoch):
@@ -109,24 +108,21 @@ def train(args):
             
             n_iter += 1
 
+            # Print running losses
             if n_iter % 100 == 0:
                 print(n_iter)
- 
                 step_loss = running_loss / (n_iter - n_prev_iter)
                 print(f'Training loss: {step_loss}')
                 n_prev_iter = n_iter
                 running_loss = 0
 
-            if n_iter % 1000 == 0 or args.debug:
-                if args.debug:
-                    prec, recall, f1 = eval(model, dev_loader, device, args)
-
+            # Save the checkpoint
+            if n_iter % 1000 == 0:
                 try:
                     os.makedirs(f'../results/checkpoints/{args.name}')
                 except:
                     pass
-                save_path = f'../results/checkpoints/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}_{best_f1}.bin'
-                print(f'Best f1: {best_f1}')
+                save_path = f'../results/checkpoints/{args.name}/batchsize{args.batch_size}_lr{args.lr}_{epoch}_{batch_idx}.bin'
                 print(f'Saving the checkpoint at {save_path}')
                 torch.save({
                     'epoch': epoch,
@@ -135,21 +131,9 @@ def train(args):
                     'optimiser_state_dict': optimiser.state_dict(),
                     }, save_path)
 
+            # Eval
             if n_iter % 5000 == 0 or args.eval:
-
-                try:
-                    prec, recall, f1 = eval(model, dev_loader, device, args)
-                    writer.add_scalar('dev/prec', prec, n_iter)
-                    writer.add_scalar('dev/recall', recall, n_iter)
-                    writer.add_scalar('dev/f1', f1, n_iter)
-                    print(f'F1: {f1}')
-                except:
-                    print('eval died!!')
-                    assert args.eval == False
-                    f1 = best_f1 + 1e-10
-                
-                if f1 > best_f1:
-                    best_f1 = f1
+                eval(model, dev_loader, device, args)
                     
     print('DONE !!!')
 
@@ -158,21 +142,22 @@ def eval(model, loader, device, args):
     
     model.eval()
     with torch.no_grad():
-        n_pred, n_ref, n_hit = 0, 0, 0
+        n_preds, n_refs, n_hits = 0, 0, 0
 
         for idx, batch in enumerate(loader):
             
             # notes_ref: [[note sequence: [start, pitch, dur], ...], ...]
-            chd, editor_in, notes_ref = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel)
+            chd, editor_in, notes_ref, notes_rule = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel)
             if not args.eval_rules:
                 notes_pred = model.inference(chd, editor_in)
             else:
-                notes_pred, _, _ = model.inference(chd, editor_in, return_context_inserts=True)
+                notes_pred = notes_rule
                 
             for i in range(len(notes_ref)):
-                n_pred += len(notes_pred[i])
-                n_ref += len(notes_ref[i])
-                n_hit += eval_notes_hits(notes_pred[i], notes_ref[i])    
+                n_pred, n_ref, n_hit = eval_notes_hits_timestep(notes_pred[i], notes_ref[i])
+                n_preds += n_pred
+                n_refs += n_ref
+                n_hits += n_hit
 
         # Eval for f1
         if n_pred == 0:
@@ -201,6 +186,29 @@ def eval_notes_hits(notes_pred, notes_ref):
                 notes_ref.pop(i)
                 break
     return n_hits
+
+def notes_break_down_to_steps(notes):
+    out = []
+    for note in notes:
+        for step in range(note[0], note[2]):
+            out.append([note[1], step])
+    return out
+
+def eval_notes_hits_timestep(notes_pred, notes_ref):
+    # notes: [[start, pitch, duration], ...]
+
+    # break down into [pitch, step] for all steps the pitch is played
+    pieces_pred = notes_break_down_to_steps(notes_pred)
+    pieces_ref = notes_break_down_to_steps(notes_ref)
+
+    n_pred = len(pieces_pred)
+    n_ref = len(pieces_ref)
+    n_hit = 0
+    
+    for piece in pieces_pred:
+        if piece in pieces_ref:
+            n_hit += 1
+    return n_pred, n_ref, n_hit
 
 if __name__ == '__main__':
 

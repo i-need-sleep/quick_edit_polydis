@@ -113,7 +113,7 @@ class Collate(object):
         atr, cpt_atr, cpt_rel, mask, inds, length = [], [], [], [], [], []
         atr_dec, cpt_atr_dec, cpt_rel_dec, length_dec, output_mask_dec = [], [], [], [], []
         atr_original, rel_original = [], []
-        notes_ref = []
+        notes_ref, notes_rules = [], []
         
         for line_idx in range(pr_mat.shape[0]):
             # Notes after HST
@@ -124,6 +124,7 @@ class Collate(object):
 
             # Apply rule-based approximations to the input notes
             notes_rule = self.rule(notes, chords[line_idx])
+            notes_rules.append(utils.data_utils.prettymidi_notes_to_onset_pitch_duration(notes_rule))
 
             # Derive edits 
             notes_out_line, pitch_changes_line, n_inserts_line, inserts_line, decoder_notes_in_line = self.editor.get_edits(notes_rule, notes_polydis)
@@ -214,6 +215,7 @@ class Collate(object):
             'output_mask_dec': output_mask_dec,
 
             'notes_ref': notes_ref,
+            'notes_rules': notes_rules,
 
             'atr_original': atr_original,
             'rel_original': rel_original,

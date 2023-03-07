@@ -51,22 +51,24 @@ def prep_batch_inference(batch, device, ref=True, include_original_notes=False, 
     if ref:
         notes_ref = batch['notes_ref']
 
+    notes_rule = batch['notes_rules']
+
     if altered_atr_original_rel:
         rel_original = torch.tensor(batch['rel_original']).to(device)
-        return chd, [atr, rel_original, length], notes_ref
+        return chd, [atr, rel_original, length], notes_ref, notes_rule
 
 
     if include_original_notes:
         atr_original = torch.tensor(batch['atr_original']).to(device)
 
         if not swap_original_rules: 
-            return chd, [atr, cpt_rel, length, atr_original], notes_ref
+            return chd, [atr, cpt_rel, length, atr_original], notes_ref, notes_rule
         else:
             rel_original = torch.tensor(batch['rel_original']).to(device)
-            return chd, [atr_original, rel_original, length, atr], notes_ref
+            return chd, [atr_original, rel_original, length, atr], notes_ref, notes_rule
 
 
-    return chd, [atr, cpt_rel, length], notes_ref
+    return chd, [atr, cpt_rel, length], notes_ref, notes_rule
 
 def lay_flat(lst):
     # Pool sublist elements into a big list
