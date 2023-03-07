@@ -134,6 +134,7 @@ def train(args):
             # Eval
             if n_iter % 5000 == 0 or args.eval:
                 eval(model, dev_loader, device, args)
+                break
                     
     print('DONE !!!')
 
@@ -160,12 +161,12 @@ def eval(model, loader, device, args):
                 n_hits += n_hit
 
         # Eval for f1
-        if n_pred == 0:
-            n_pred = 1
-        if n_ref == 0:
-            n_ref = 1
-        prec = n_hit / n_pred
-        recall = n_hit / n_ref
+        if n_preds == 0:
+            n_preds = 1
+        if n_refs == 0:
+            n_refs = 1
+        prec = n_hits / n_preds
+        recall = n_hits / n_refs
         if prec > 0 and recall > 0:
             f1 = 2/(1/prec + 1/recall)
         else:
