@@ -74,7 +74,7 @@ def train(args):
                 model.train()
                 optimiser.zero_grad()
 
-                chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel)
+                chd, editor_in, edits_ref, n_inserts_ref, decoder_in, decoder_ref, decoder_out_mask = prep_batch(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel, original_atr_original_rel=args.original_atr_original_rel)
 
                 # Encoder forward pass
                 z_chd = model.encode_chd(chd)
@@ -148,7 +148,7 @@ def eval(model, loader, device, args):
         for idx, batch in enumerate(loader):
             
             # notes_ref: [[note sequence: [start, pitch, dur], ...], ...]
-            chd, editor_in, notes_ref, notes_rule = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel)
+            chd, editor_in, notes_ref, notes_rule = prep_batch_inference(batch, device, include_original_notes=args.include_original_notes, swap_original_rules=args.swap_original_rules, altered_atr_original_rel=args.altered_atr_original_rel, original_atr_original_rel=args.original_atr_original_rel)
             if not args.eval_rules:
                 notes_pred = model.inference(chd, editor_in)
             else:
@@ -237,6 +237,7 @@ if __name__ == '__main__':
     parser.add_argument('--swap_original_rules', action='store_true')
     parser.add_argument('--from_scratch', action='store_true')
     parser.add_argument('--altered_atr_original_rel', action='store_true')
+    parser.add_argument('--original_atr_original_rel', action='store_true')
 
     # Debug
     parser.add_argument('--debug', action='store_true')

@@ -1,7 +1,7 @@
 import pretty_midi
 import torch
 
-def prep_batch(batch, device, include_original_notes=False, swap_original_rules=False, altered_atr_original_rel=False):
+def prep_batch(batch, device, include_original_notes=False, swap_original_rules=False, altered_atr_original_rel=False, original_atr_original_rel=False):
 
     chd = batch['chords'].to(device)
 
@@ -29,6 +29,9 @@ def prep_batch(batch, device, include_original_notes=False, swap_original_rules=
     if altered_atr_original_rel:
         return chd, [atr, rel_original, length], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
 
+    if original_atr_original_rel:
+        return chd, [atr_original, rel_original, length], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
+
     if include_original_notes:
 
         if not swap_original_rules:
@@ -38,7 +41,7 @@ def prep_batch(batch, device, include_original_notes=False, swap_original_rules=
     
     return chd, [atr, cpt_rel, length], pitch_changes, n_inserts, [decoder_atr_in, decoder_rel_in, decoder_len], decoder_atr_out, decoder_output_mask
 
-def prep_batch_inference(batch, device, ref=True, include_original_notes=False, swap_original_rules=False, altered_atr_original_rel=False):
+def prep_batch_inference(batch, device, ref=True, include_original_notes=False, swap_original_rules=False, altered_atr_original_rel=False, original_atr_original_rel=False):
 
     chd = batch['chords'].to(device)
 
@@ -53,10 +56,14 @@ def prep_batch_inference(batch, device, ref=True, include_original_notes=False, 
 
     notes_rule = batch['notes_rules']
 
+    atr_original = torch.tensor(batch['atr_original']).to(device)
+    rel_original = torch.tensor(batch['rel_original']).to(device)
+
     if altered_atr_original_rel:
-        rel_original = torch.tensor(batch['rel_original']).to(device)
         return chd, [atr, rel_original, length], notes_ref, notes_rule
 
+    if original_atr_original_rel:
+        return chd, [atr_original, rel_original, length], notes_ref, notes_rule
 
     if include_original_notes:
         atr_original = torch.tensor(batch['atr_original']).to(device)
